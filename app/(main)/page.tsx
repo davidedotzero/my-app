@@ -44,8 +44,8 @@ const LatestArticlesSection = () => {
 export default async function Home() {
   return (
     <>
-      {/* <Hero /> */}
-      <section className="bg-gradient-to-r from-green-600 to-teal-500 text-white py-20 md:py-32">
+      <Hero />
+      {/* <div className="w-full bg-gradient-to-r from-green-600 to-teal-500 text-white py-20 md:py-32">
         <div className="container mx-auto px-6 text-center">
           <h1 className="text-4xl md:text-6xl font-bold mb-4">
             บ้านไม้ดาวิ (ไดกิ บอนไซ)
@@ -62,7 +62,7 @@ export default async function Home() {
             </a>
           </div>
         </div>
-      </section>
+      </div> */}
 
       {/* 4. เรียกใช้ Component <LatestArticlesSection /> ที่นี่ */}
       {/* ทำให้ส่วนของ `articles.map` ถูกเรียกใช้ภายใน scope ที่ถูกต้อง */}

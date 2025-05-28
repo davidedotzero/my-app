@@ -1,77 +1,48 @@
-import DeployButton from "@/components/deploy-button";
+// app/(main)/layout.tsx
+import Link from "next/link";
+import DeployButton from "@/components/deploy-button"; // สมมติว่ามี component เหล่านี้
 import { EnvVarWarning } from "@/components/env-var-warning";
 import HeaderAuth from "@/components/header-auth";
-import { ThemeSwitcher } from "@/components/theme-switcher";
-import { hasEnvVars } from "@/utils/supabase/check-env-vars";
-import { Geist } from "next/font/google";
-import { ThemeProvider } from "next-themes";
-import Link from "next/link";
+import { hasEnvVars } from "@/utils/supabase/check-env-vars"; // สมมติว่ามี util นี้
 
+// ไม่ต้องมี <html>, <body>, ThemeProvider, metadata ซ้ำซ้อนที่นี่
+// ไม่ต้อง import globals.css หรือ font ซ้ำที่นี่
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : "http://localhost:3000";
-
-export const metadata = {
-  metadataBase: new URL(defaultUrl),
-  title: "Next.js and Supabase Starter Kit",
-  description: "The fastest way to build apps with Next.js and Supabase",
-};
-
-const geistSans = Geist({
-  display: "swap",
-  subsets: ["latin"],
-});
-
-export default function RootLayout({
+// ตั้งชื่อ Component ให้สื่อความหมาย
+export default function MainLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={geistSans.className} suppressHydrationWarning>
-      <body className="bg-background text-foreground">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <main className="min-h-screen flex flex-col items-center">
-            <div className="flex-1 w-full flex flex-col gap-20 items-center">
-              <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
-                <div className="w-full max-w-5xl flex justify-between items-center p-3 px-5 text-sm">
-                  <div className="flex gap-5 items-center font-semibold">
-                    <Link href={"/"}>Next.js Supabase Starter</Link>
-                    <div className="flex items-center gap-2">
-                      <DeployButton />
-                    </div>
-                  </div>
-                  {!hasEnvVars ? <EnvVarWarning /> : <HeaderAuth />}
-                </div>
-              </nav>
-              <div className="flex flex-col gap-20 max-w-5xl p-5">
-                {children}
-              </div>
+    <> {/* ใช้ Fragment หรือ div ถ้าจำเป็น */}
+      <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16 sticky top-0 bg-background/95 backdrop-blur z-10">
+        <div className="w-full max-w-5xl flex justify-between items-center p-3 px-5 text-sm">
+          <div className="flex gap-5 items-center font-semibold">
+            <Link href={"/"}>บ้านไม้ดาวิ</Link> {/* ปรับชื่อเว็บ */}
+            {/* เพิ่ม Links อื่นๆ สำหรับส่วน main เช่น บทความ, ผลงาน, เกี่ยวกับเรา */}
+            <Link href={"/articles"}>บทความ</Link>
+            <Link href={"/creations"}>ผลงานของเรา</Link>
+            <Link href={"/about"}>เกี่ยวกับเรา</Link>
+            <Link href={"/contact"}>ติดต่อเรา</Link>
+          </div>
+          {/* ส่วน DeployButton และ HeaderAuth อาจจะย้ายไปอยู่ในส่วน header ของ RootLayout ถ้าต้องการให้แสดงทุกหน้า */}
+          <div className="flex items-center gap-2">
+            {hasEnvVars && <DeployButton />}
+            {!hasEnvVars ? <EnvVarWarning /> : <HeaderAuth />}
+          </div>
+        </div>
+      </nav>
 
-              <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16">
-                <p>
-                  Powered by{" "}
-                  <a
-                    href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
-                    target="_blank"
-                    className="font-bold hover:underline"
-                    rel="noreferrer"
-                  >
-                    Supabase
-                  </a>
-                </p>
-                <ThemeSwitcher />
-              </footer>
-            </div>
-          </main>
-        </ThemeProvider>
-      </body>
-    </html>
+      {/* เนื้อหาของแต่ละหน้าในส่วน (main) จะถูก render ที่นี่ */}
+      <div className="flex-1 w-full flex flex-col items-center py-8 md:py-12">
+        <div className="w-full max-w-5xl p-5 flex flex-col gap-12 md:gap-16">
+         {children}
+        </div>
+      </div>
+
+      {/* Footer สำหรับส่วน (main) ถ้าต้องการแยกจาก RootLayout Footer */}
+      {/* ถ้า Footer เหมือนกันทั้งเว็บ ก็เอาออกจากที่นี่ แล้วไปใช้ของ RootLayout */}
+    </>
   );
 }
