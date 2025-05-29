@@ -19,7 +19,7 @@ export default function MainLayout({
       <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16 sticky top-0 bg-background/95 backdrop-blur z-10">
         <div className="w-full max-w-5xl flex justify-between items-center p-3 px-5 text-sm">
           <div className="flex gap-5 items-center font-semibold">
-            <Link href={"/"}>บ้านไม้ดาวิ</Link> {/* ปรับชื่อเว็บ */}
+            <Link className="text-primary font-bold" href={"/"}>Baanmaih Davi</Link> {/* ปรับชื่อเว็บ */}
             {/* เพิ่ม Links อื่นๆ สำหรับส่วน main เช่น บทความ, ผลงาน, เกี่ยวกับเรา */}
             <Link href={"/articles"}>บทความ</Link>
             <Link href={"/creations"}>ผลงานของเรา</Link>

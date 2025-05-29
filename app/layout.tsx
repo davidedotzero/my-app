@@ -44,8 +44,7 @@ export default function RootLayout({
           {/* Footer หลักของทั้งเว็บ (ถ้ามี และใช้เหมือนกันทุกส่วนจริงๆ) */}
           <footer className="w-full flex items-center justify-center border-t text-center text-xs gap-8 py-8">
             <p>
-              พัฒนาโดย บ้านไม้ดาวิ (ไดกิ บอนไซ) {/* ปรับข้อความ */}
-              {/* หรือจะคง Powered by Supabase ไว้ก็ได้ถ้าต้องการให้เครดิต */}
+              Powered by Supabase
             </p>
             <ThemeSwitcher />
           </footer>

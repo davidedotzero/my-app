@@ -1,35 +1,39 @@
-import NextLogo from "./next-logo";
-import SupabaseLogo from "./supabase-logo";
+import Link from 'next/link';
 
 export default function Header() {
+  const siteName = "Baan Maih Davi"; // คงการสะกดตามที่คุณให้มา
+  const subBrandName = "ダイキ盆栽";
+  const slogan = "Art of Serenity: Discover Nature's Beauty in Bonsai.";
+  const primaryButtonText = "View Our Works";
+  const secondaryButtonText = "Our Story";
+
   return (
-    <div className="flex flex-col gap-16 items-center">
-      {/* <div className="flex gap-8 justify-center items-center">
-        <a
-          href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <SupabaseLogo />
-        </a>
-        <span className="border-l rotate-45 h-6" />
-        <a href="https://nextjs.org/" target="_blank" rel="noreferrer">
-          <NextLogo />
-        </a>
-      </div> */}
-      {/* <h1 className="sr-only">Supabase and Next.js Starter Template</h1> */}
-      <h1 className="text-3xl lg:text-4xl font-bold mx-auto max-w-xl text-center">
-        บ้านไม้ดาวิ (ไดกิ บอนไซ)
-      </h1>
-      <div>
-        <a href="/" className="bg-white text-green-700 font-semibold px-8 py-3 rounded-md hover:bg-green-50 transition-colors duration-300 text-lg mr-4">
-          ชมผลงานของเรา
-        </a>
-        <a href="/" className="border-2 border-white text-white font-semibold px-8 py-3 rounded-md hover:bg-white hover:text-green-700 transition-colors duration-300 text-lg">
-          เรื่องราวของเรา
-        </a>
+    <section className="w-full bg-white text-primary-foreground py-20 md:py-28 px-4">
+      <div className="container mx-auto text-center flex flex-col items-center">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-primary">
+          {siteName}
+        </h1>
+        <p className="text-2xl sm:text-3xl md:text-4xl text-primary font-light mt-2 mb-6">
+          {subBrandName}
+        </p>
+        <p className="text-lg md:text-xl text-primary hover:text-primary max-w-2xl mx-auto mb-10 md:mb-12">
+          {slogan}
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+          <Link
+            href="/creations"
+            className="inline-block px-10 py-3 text-lg font-semibold text-center text-white bg-primary rounded-lg shadow-md hover:text-primary hover:bg-primary-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all duration-300 ease-in-out transform hover:scale-105"
+          >
+            {primaryButtonText}
+          </Link>
+          <Link
+            href="/about"
+            className="inline-block px-10 py-3 text-lg font-semibold text-center text-primary bg-transparent border-2 border-primary-foreground rounded-lg shadow-sm hover:bg-primary hover:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all duration-300 ease-in-out transform hover:scale-105"
+          >
+            {secondaryButtonText}
+          </Link>
+        </div>
       </div>
-      <div className="w-full p-[1px] bg-gradient-to-r from-transparent via-foreground/10 to-transparent my-8" />
-    </div>
+    </section>
   );
 }
