@@ -46,14 +46,14 @@ export default async function LatestArticlesSection() {
   }
 
   return (
-    <section className="py-12 md:py-16 bg-white border-2">
+    <section className="py-12 md:py-16 bg-white">
       <div className="container mx-auto px-6">
-        <h2 className="text-3xl md:text-4xl font-semibold text-center text-primary mb-8 md:mb-12">
+        <h2 className="text-3xl md:text-4xl font-semibold text-center text-black mb-8 md:mb-12">
           บทความล่าสุด
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {articles.map((article) => (
-            <div key={article.id} className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
+            <div key={article.id} className="bg-white p-6 border-2 rounded-lg hover:shadow-md transition-shadow duration-300 flex flex-col">
               {article.image_url && (
                 <div className="mb-4 h-40 w-full overflow-hidden rounded-md">
                   <img src={article.image_url} alt={article.title} className="w-full h-full object-cover" />
@@ -70,7 +70,7 @@ export default async function LatestArticlesSection() {
             </div>
           ))}
         </div>
-        <div className="text-center mt-10 md:mt-14">
+        <div className="text-end mt-10 md:mt-14">
           <Link
             href="/articles"
             className="bg-primary dark:bg-primary text-white px-8 py-3 rounded-md hover:bg-primary-foreground dark:hover:bg-primary-foreground hover:text-primary transition-colors duration-300 text-lg"

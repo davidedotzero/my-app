@@ -30,6 +30,11 @@ function AdminSidebar() {
           <Users size={18} />
           Manage Users
         </Link>
+        <Link href="/admin/categories/new" className="flex items-center gap-3 py-2.5 px-4 rounded-md hover:bg-slate-700 transition-colors text-sm">
+          <Settings size={18} />
+          Manage Categories
+        </Link>
+
         {/* <Link href="/admin/settings" className="flex items-center gap-3 py-2.5 px-4 rounded-md hover:bg-slate-700 transition-colors text-sm">
           <Settings size={18} />
           Settings

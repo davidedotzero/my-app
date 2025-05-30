@@ -26,6 +26,10 @@ async function updateArticleAction(articleId: number, currentSlugFromDb: string,
   const excerpt = formData.get('excerpt') as string | null;
   const content = formData.get('content') as string;
   const imageUrl = formData.get('image_url') as string | null;
+  const categoryIdString = formData.get('category_id') as string | null;
+  const category_id = categoryIdString && categoryIdString !== "" && !isNaN(parseInt(categoryIdString, 10))
+    ? parseInt(categoryIdString, 10)
+    : null;
 
   const redirectOnError = (errorCode: string, errorMessage: string) => {
     return redirect(`/admin/articles/edit/${articleId}?error=${errorCode}&message=${encodeURIComponent(errorMessage)}`);
@@ -39,16 +43,16 @@ async function updateArticleAction(articleId: number, currentSlugFromDb: string,
   if (!newSlug) {
     newSlug = generateSlug(title);
     if (!newSlug && title) { // ถ้า title มีค่า แต่ newSlug ยังว่าง (เช่น title มีแต่อักขระพิเศษ)
-        console.error('[Update Action] Validation Error: Cannot generate slug from title. Please provide a valid slug.');
-        return redirectOnError('slug_generation_failed', 'ไม่สามารถสร้าง slug จากหัวข้อที่ระบุได้ กรุณากรอก Slug เอง');
+      console.error('[Update Action] Validation Error: Cannot generate slug from title. Please provide a valid slug.');
+      return redirectOnError('slug_generation_failed', 'ไม่สามารถสร้าง slug จากหัวข้อที่ระบุได้ กรุณากรอก Slug เอง');
     } else if (!newSlug && !title) { // ถ้า title ว่างด้วย
-        console.error('[Update Action] Validation Error: Cannot generate slug from empty title.');
-        return redirectOnError('slug_generation_failed', 'ไม่สามารถสร้าง slug จากหัวข้อได้ กรุณาใส่หัวข้อหรือ slug เอง');
+      console.error('[Update Action] Validation Error: Cannot generate slug from empty title.');
+      return redirectOnError('slug_generation_failed', 'ไม่สามารถสร้าง slug จากหัวข้อได้ กรุณาใส่หัวข้อหรือ slug เอง');
     }
   } else {
     newSlug = generateSlug(newSlug); // Clean slug ที่ผู้ใช้กรอก
   }
-  
+
   const supabase = await createClient();
   const { data: updatedArticleData, error: dbError } = await supabase
     .from('articles')
@@ -58,6 +62,7 @@ async function updateArticleAction(articleId: number, currentSlugFromDb: string,
       excerpt: excerpt?.trim() || null,
       content: content.trim(),
       image_url: imageUrl?.trim() || null,
+      category_id: category_id,
     })
     .eq('id', articleId)
     .select('slug')
@@ -76,7 +81,7 @@ async function updateArticleAction(articleId: number, currentSlugFromDb: string,
     console.error(`[Update Action] Error: Article with ID ${articleId} not found after update or update failed.`);
     return redirectOnError('update_failed', 'ไม่พบข้อมูลบทความหลังจากการอัปเดต หรือการอัปเดตล้มเหลว');
   }
-  
+
   console.log('[Update Action] Article updated successfully. New slug:', updatedArticleData.slug);
 
   revalidatePath('/admin/articles');
@@ -94,7 +99,7 @@ async function updateArticleAction(articleId: number, currentSlugFromDb: string,
 
 type EditArticlePageProps = {
   params: {
-    id: string; 
+    id: string;
   };
   searchParams?: {
     error?: string;
@@ -103,7 +108,7 @@ type EditArticlePageProps = {
 };
 
 export async function generateMetadata({ params }: EditArticlePageProps): Promise<Metadata> {
-  const awaitedParams = await params; // <--- เพิ่ม await params
+  const awaitedParams = await params;
   const articleId = parseInt(awaitedParams.id, 10);
 
   if (isNaN(articleId)) {
@@ -122,24 +127,46 @@ export async function generateMetadata({ params }: EditArticlePageProps): Promis
   };
 }
 
+type ArticleWithCategory = {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string;
+  image_url: string | null;
+  created_at: string;
+  updated_at: string;
+  category_id: number | null; // เพิ่ม category_id
+};
+
+type Category = {
+  id: number;
+  name: string;
+};
+
 export default async function EditArticlePage({ params, searchParams }: EditArticlePageProps) {
   const awaitedParams = await params; // <--- เพิ่ม await params
   const resolvedSearchParams = searchParams ? await searchParams : { error: undefined, message: undefined }; // <--- เพิ่ม await searchParams
 
   const articleId = parseInt(awaitedParams.id, 10);
-  const errorType = resolvedSearchParams.error;
-  const message = resolvedSearchParams.message;
 
   if (isNaN(articleId)) {
     notFound();
   }
 
   const supabase = await createClient();
+  // 1. ดึงข้อมูลบทความที่จะแก้ไข
   const { data: article, error: fetchError } = await supabase
     .from('articles')
-    .select('*')
+    .select('*') // ดึงทุกอย่าง รวมถึง category_id
     .eq('id', articleId)
-    .single();
+    .single<ArticleWithCategory>(); // ใช้ Type ที่มี category_id
+
+  // 2. ดึงรายการ Category ทั้งหมดสำหรับ Dropdown
+  const { data: categories, error: categoriesError } = await supabase
+    .from('categories')
+    .select('id, name')
+    .order('name', { ascending: true });
 
   if (fetchError || !article) {
     console.error(`Error fetching article (ID: ${articleId}) for edit:`, fetchError);
@@ -147,6 +174,9 @@ export default async function EditArticlePage({ params, searchParams }: EditArti
   }
 
   const updateActionWithParams = updateArticleAction.bind(null, article.id, article.slug);
+
+  const errorType = resolvedSearchParams.error;
+  const message = resolvedSearchParams.message;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -237,6 +267,27 @@ export default async function EditArticlePage({ params, searchParams }: EditArti
             defaultValue={article.image_url || ''}
             className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors"
           />
+        </div>
+
+        {/* เพิ่ม Dropdown สำหรับเลือก Category */}
+        <div>
+          <label htmlFor="category_id" className="block text-sm font-medium text-foreground/90 mb-1.5">
+            หมวดหมู่ (Category)
+          </label>
+          <select
+            name="category_id"
+            id="category_id"
+            defaultValue={article.category_id?.toString() || ""} // <--- ตั้ง defaultValue จาก article.category_id
+            className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors"
+          >
+            <option value="">-- ไม่ระบุหมวดหมู่ --</option> {/* เพิ่ม option สำหรับไม่เลือก */}
+            {categories?.map((category) => (
+              <option key={category.id} value={category.id.toString()}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+          {categoriesError && <p className="mt-1 text-xs text-destructive">ไม่สามารถโหลดรายการหมวดหมู่ได้</p>}
         </div>
 
         <div className="flex items-center gap-4 pt-3">

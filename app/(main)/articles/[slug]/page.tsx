@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { Edit3 , FilePlus2 } from 'lucide-react'; // ใช้ไอคอนสำหรับปุ่มแก้ไข
 // ถ้าคุณจะใช้ ReactMarkdown ให้ uncomment สองบรรทัดนี้ และติดตั้ง library:
 // import ReactMarkdown from 'react-markdown';
 // import remarkGfm from 'remark-gfm';
@@ -58,6 +59,21 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   const supabase = await createClient();
 
+  // --- 1. ดึงข้อมูล User ปัจจุบันและตรวจสอบว่าเป็น Admin หรือไม่ ---
+  const { data: { user } } = await supabase.auth.getUser();
+  let isAdmin = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    if (profile && profile.role === 'admin') {
+      isAdmin = true;
+    }
+  }
+  // --- สิ้นสุดการตรวจสอบ Admin ---
+
   const { data: article, error: pageError } = await supabase
     .from('articles')
     .select('*')
@@ -76,6 +92,17 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+      {isAdmin && (
+        <div className="mb-6 pb-6 border-b border-border text-right">
+          <Link
+            href={`/admin/articles/edit/${article.id}`} // <--- ลิงก์ไปยังหน้าแก้ไขโดยใช้ article.id
+            className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-4 rounded-md shadow hover:shadow-md transition-all text-sm"
+          >
+            <Edit3 size={16} />
+            แก้ไขบทความนี้ (Admin)
+          </Link>
+        </div>
+      )}
       <article className="prose prose-slate dark:prose-invert lg:prose-xl max-w-3xl mx-auto">
         <div className="mb-8">
           <Link href="/articles" className="text-primary hover:text-primary/80 dark:text-primary dark:hover:text-primary/80 transition-colors">

@@ -50,7 +50,7 @@ export default async function ManageUsersPage() {
                 <th scope="col" className="px-6 py-3 font-medium">Username</th>
                 <th scope="col" className="px-6 py-3 font-medium">Full Name</th>
                 <th scope="col" className="px-6 py-3 font-medium">Current Role</th>
-                <th scope="col" className="px-6 py-3 font-medium">Joined At</th> {/* เปลี่ยนชื่อคอลัมน์ */}
+                <th scope="col" className="px-6 py-3 font-medium">Joined At</th>
                 <th scope="col" className="px-6 py-3 font-medium">Change Role</th>
               </tr>
             </thead>

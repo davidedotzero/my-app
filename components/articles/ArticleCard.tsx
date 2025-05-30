@@ -8,13 +8,13 @@ type ArticleCardProps = {
     slug: string;
     excerpt?: string | null;
     image_url?: string | null;
-    created_at?: string; // (Optional) ถ้าต้องการแสดงวันที่บนการ์ด
+    created_at?: string;
   };
 };
 
 export default function ArticleCard({ article }: ArticleCardProps) {
   return (
-    <article className="bg-card text-card-foreground rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out flex flex-col overflow-hidden border border-border">
+    <article className="bg-card text-card-foreground transition-all duration-300 ease-in-out flex flex-col overflow-hidden border border-border">
       {article.image_url && (
         <Link href={`/articles/${article.slug}`} className="block aspect-video overflow-hidden">
           <Image
@@ -37,6 +37,13 @@ export default function ArticleCard({ article }: ArticleCardProps) {
             {article.excerpt}
           </p>
         )}
+        <div className="text-xs text-muted-foreground mb-4">
+          {article.created_at ? new Date(article.created_at).toLocaleDateString('th-TH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          }) : 'ยังไม่ระบุวันที่'}
+        </div>
         <div className="mt-auto pt-2">
           <Link
             href={`/articles/${article.slug}`}

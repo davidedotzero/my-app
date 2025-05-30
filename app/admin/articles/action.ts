@@ -1,3 +1,4 @@
+// app/admin/articles/actions.ts
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
@@ -5,204 +6,185 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 
 function generateSlug(title: string): string {
-  if (!title) return `article-${Date.now().toString().slice(-6)}`; // fallback ถ้า title ว่าง
-
-  let slug = title
-    .toLowerCase()
-    .trim()
-    // แทนที่อักขระไทยด้วย '' หรือคุณอาจจะหา library สำหรับ transliterate
-    // สำหรับตอนนี้ เราจะลบอักขระที่ไม่ใช่ alphanumeric ภาษาอังกฤษออกไปก่อน
-    // ซึ่งจะทำให้ slug จากภาษาไทยล้วนๆ เป็นค่าว่าง
-    .replace(/[\u0E00-\u0E7F]+/g, '') // ลบอักขระภาษาไทย
-    .replace(/\s+/g, '-')
-    .replace(/[^\w-]+/g, '')
-    .replace(/--+/g, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '');
-
-  if (!slug) {
-    // ถ้า slug ยังคงว่างเปล่า (เช่น title เป็นภาษาไทยล้วน)
-    // ให้สร้าง slug จากส่วนหนึ่งของ timestamp หรือ ID (ถ้ามี)
-    // หรืออาจจะให้ผู้ใช้กรอก slug ภาษาอังกฤษเองเป็นภาคบังคับถ้า title เป็นภาษาไทย
-    // ตัวอย่าง: ใช้ส่วนหนึ่งของ timestamp
-    return `article-${Date.now().toString().slice(-6)}`;
-  }
+  if (!title?.trim()) return `article-${Date.now().toString().slice(-6)}`;
+  let slug = title.toLowerCase().trim().replace(/[\u0E00-\u0E7F]+/g, '').replace(/\s+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+/, '').replace(/-+$/, '');
+  if (!slug) { return `article-${Date.now().toString().slice(-6)}`; }
   return slug;
 }
 
 export async function addArticleAction(formData: FormData) {
-  'use server';
-
+  // ... (โค้ด addArticleAction ของคุณที่ปรับปรุงแล้ว ถือว่าค่อนข้างดีแล้ว) ...
+  // (ตรวจสอบว่าทุก error case มีการ redirect พร้อม message ที่ encodeURIComponent แล้ว)
   const title = formData.get('title') as string;
   let slug = formData.get('slug') as string;
   const excerpt = formData.get('excerpt') as string | null;
   const content = formData.get('content') as string;
   const imageUrl = formData.get('image_url') as string | null;
+  const categoryIdString = formData.get('category_id') as string | null;
+  const category_id = categoryIdString && categoryIdString !== "" && !isNaN(parseInt(categoryIdString, 10)) 
+                      ? parseInt(categoryIdString, 10) 
+                      : null;
 
   if (!title || !content) {
-    console.error('[Add Action] Validation Error: Title and content are required.');
     const message = 'หัวข้อและเนื้อหาเป็นฟิลด์ที่จำเป็น';
-    return redirect(`/admin/articles/new?error=validation_failed&message=${encodeURIComponent(message)}`); // <--- ใช้ encodeURIComponent
+    return redirect(`/admin/articles/new?error=validation_failed&message=${encodeURIComponent(message)}`);
   }
 
-  if (!slug) { // สมมติว่า slug จากฟอร์มชื่อ slugFromForm
+  if (!slug) {
     slug = generateSlug(title);
-    if (!slug.startsWith('article-') && slug === generateSlug('')) { // ตรวจสอบว่า slug ที่ได้มาไม่ได้มาจาก fallback ของ title ว่างเปล่าจริงๆ
-        console.error('[Action] Validation Error: Slug is required or title is invalid for auto-generation.');
-        // ควรจะแจ้งให้ผู้ใช้กรอก slug ภาษาอังกฤษเองถ้า title เป็นภาษาไทยล้วนและไม่ได้ตั้งใจให้เป็น article-xxxxxx
-        const message = 'หัวข้อเป็นภาษาไทยล้วน กรุณากรอก Slug เป็นภาษาอังกฤษ หรือเว้นว่างเพื่อให้ระบบสร้าง Slug อัตโนมัติ (อาจจะไม่สื่อความหมาย)';
-        return redirect(`/admin/articles/new?error=slug_required_for_thai_title&message=${encodeURIComponent(message)}`);
+    if (slug.startsWith('article-') && title.trim() !== "") { 
+      // This means title was likely all Thai or special chars, resulting in fallback slug.
+      // No need to error if title itself was valid.
+    } else if (!slug && !title.trim()) { // Both title and slug are effectively empty
+        const message = 'ไม่สามารถสร้าง slug จากหัวข้อได้ กรุณาใส่หัวข้อหรือ slug เอง';
+        return redirect(`/admin/articles/new?error=slug_generation_failed&message=${encodeURIComponent(message)}`);
     }
   } else {
-    slug = generateSlug(slug); // Clean slug ที่ผู้ใช้กรอก
+    slug = generateSlug(slug);
   }
+  // Check slug again after generation/cleaning
+  if (!slug) {
+    const message = 'Slug ไม่ถูกต้องหลังจากพยายามสร้างหรือ clean ค่าที่กรอกมา';
+    return redirect(`/admin/articles/new?error=slug_invalid&message=${encodeURIComponent(message)}`);
+  }
+
 
   const supabase = await createClient();
   const { data, error: dbError } = await supabase
     .from('articles')
-    .insert([
-      {
-        title: title.trim(),
-        slug: slug,
-        excerpt: excerpt?.trim() || null,
-        content: content.trim(),
-        image_url: imageUrl?.trim() || null,
-      },
-    ])
-    .select()
+    .insert([{ title: title.trim(), slug, excerpt: excerpt?.trim() || null, content: content.trim(), image_url: imageUrl?.trim() || null, category_id }])
+    .select('slug')
     .single();
 
   if (dbError) {
-    console.error('[Add Action] Supabase Error creating article:', dbError);
     let userErrorMessage = `เกิดข้อผิดพลาดในการสร้างบทความ: ${dbError.message}`;
-    if (dbError.code === '23505') { 
-      userErrorMessage = `เกิดข้อผิดพลาด: Slug "${slug}" นี้มีอยู่ในระบบแล้ว กรุณาใช้ Slug อื่น`;
-    }
-    return redirect(`/admin/articles/new?error=db_error&message=${encodeURIComponent(userErrorMessage)}`); // <--- ใช้ encodeURIComponent
+    if (dbError.code === '23505') { userErrorMessage = `เกิดข้อผิดพลาด: Slug "${slug}" นี้มีอยู่ในระบบแล้ว กรุณาใช้ Slug อื่น`; }
+    return redirect(`/admin/articles/new?error=db_error&message=${encodeURIComponent(userErrorMessage)}`);
   }
-
-  console.log('[Add Action] Article created successfully:', data);
 
   revalidatePath('/admin/articles');
   revalidatePath('/articles');
   revalidatePath('/'); 
-  if (data?.slug) {
-    revalidatePath(`/articles/${data.slug}`);
+  if (data?.slug) { revalidatePath(`/articles/${data.slug}`); }
+  // (Optional) Revalidate category page
+  if (category_id) {
+    const {data: cat} = await supabase.from('categories').select('slug').eq('id', category_id).single();
+    if (cat?.slug) revalidatePath(`/articles/category/${cat.slug}`);
   }
   const successMessage = 'สร้างบทความเรียบร้อยแล้ว!';
-  redirect(`/admin/articles?message=${encodeURIComponent(successMessage)}`); // <--- ใช้ encodeURIComponent สำหรับ success message ด้วย
+  redirect(`/admin/articles?message=${encodeURIComponent(successMessage)}`);
 }
 
-export async function updateArticleAction(articleId: number, formData: FormData) {
+
+export async function updateArticleAction(articleId: number, currentSlugFromDb: string, formData: FormData) {
+  'use server'; // ต้องมี 'use server' ในทุก action ที่ export จากไฟล์นี้
+
   if (isNaN(articleId) || articleId <= 0) {
     console.error('[Update Action] Invalid Article ID.');
-    return;
+    // ไม่สามารถ redirect กลับไปหน้า edit ได้ถ้า articleId ไม่ถูกต้อง
+    // อาจจะต้อง redirect ไปหน้ารวม หรือแสดง error กลาง
+    return redirect(`/admin/articles?error=invalid_id&message=${encodeURIComponent('ID บทความไม่ถูกต้อง')}`);
   }
 
   const title = formData.get('title') as string;
-  let slug = formData.get('slug') as string;
+  let newSlug = formData.get('slug') as string;
   const excerpt = formData.get('excerpt') as string | null;
   const content = formData.get('content') as string;
   const imageUrl = formData.get('image_url') as string | null;
+  const categoryIdString = formData.get('category_id') as string | null;
+  const category_id = categoryIdString && categoryIdString !== "" && !isNaN(parseInt(categoryIdString, 10)) 
+                      ? parseInt(categoryIdString, 10) 
+                      : null;
+
+  const redirectOnError = (errorCode: string, errorMessage: string) => {
+    return redirect(`/admin/articles/edit/${articleId}?error=${errorCode}&message=${encodeURIComponent(errorMessage)}`);
+  };
 
   if (!title || !content) {
-    console.error('[Update Action] Validation Error: Title and content are required.');
-    return;
+    return redirectOnError('validation_failed', 'หัวข้อและเนื้อหาเป็นฟิลด์ที่จำเป็น');
   }
 
-  // if (!slug) {
-  //   slug = generateSlug(title);
-  //    if (!slug) {
-  //       console.error('[Update Action] Validation Error: Cannot generate slug from empty title.');
-  //       return;
-  //   }
-  // } else {
-  //   slug = generateSlug(slug); // Clean a user-provided slug
-  // }
-
-  if (!slug) { // สมมติว่า slug จากฟอร์มชื่อ slugFromForm
-    slug = generateSlug(title);
-    if (!slug.startsWith('article-') && slug === generateSlug('')) { // ตรวจสอบว่า slug ที่ได้มาไม่ได้มาจาก fallback ของ title ว่างเปล่าจริงๆ
-        console.error('[Action] Validation Error: Slug is required or title is invalid for auto-generation.');
-        // ควรจะแจ้งให้ผู้ใช้กรอก slug ภาษาอังกฤษเองถ้า title เป็นภาษาไทยล้วนและไม่ได้ตั้งใจให้เป็น article-xxxxxx
-        const message = 'หัวข้อเป็นภาษาไทยล้วน กรุณากรอก Slug เป็นภาษาอังกฤษ หรือเว้นว่างเพื่อให้ระบบสร้าง Slug อัตโนมัติ (อาจจะไม่สื่อความหมาย)';
-        return redirect(`/admin/articles/new?error=slug_required_for_thai_title&message=${encodeURIComponent(message)}`);
+  if (!newSlug) {
+    newSlug = generateSlug(title);
+    if (newSlug.startsWith('article-') && title.trim() !== "") {
+      // Fallback slug generated from a valid title (e.g. all Thai)
+    } else if (!newSlug && !title.trim()) {
+        return redirectOnError('slug_generation_failed', 'ไม่สามารถสร้าง slug จากหัวข้อได้ กรุณาใส่หัวข้อหรือ slug เอง');
     }
   } else {
-    slug = generateSlug(slug); // Clean slug ที่ผู้ใช้กรอก
+    newSlug = generateSlug(newSlug);
+  }
+  // Check newSlug again after generation/cleaning
+  if (!newSlug) {
+    return redirectOnError('slug_invalid', 'Slug ไม่ถูกต้องหลังจากพยายามสร้างหรือ clean ค่าที่กรอกมา');
   }
 
   const supabase = await createClient();
-
-  const { data, error } = await supabase
+  const { data: updatedArticleData, error: dbError } = await supabase
     .from('articles')
     .update({
-      title,
-      slug,
-      excerpt: excerpt || null,
-      content,
-      image_url: imageUrl || null,
-      // updated_at จะถูกจัดการโดย DB trigger ที่เราสร้างไว้
+      title: title.trim(),
+      slug: newSlug,
+      excerpt: excerpt?.trim() || null,
+      content: content.trim(),
+      image_url: imageUrl?.trim() || null,
+      category_id: category_id,
     })
     .eq('id', articleId)
-    .select()
+    .select('slug') // ดึง slug ที่อัปเดตแล้วกลับมา
     .single();
 
-  if (error) {
-    console.error(`[Update Action] Supabase Error updating article (ID: ${articleId}):`, error.message);
-     if (error.code === '23505') { 
-      console.error(`[Update Action] Error: The slug "${slug}" already exists for another article.`);
+  if (dbError) {
+    let userErrorMessage = `เกิดข้อผิดพลาดในการอัปเดตบทความ: ${dbError.message}`;
+    if (dbError.code === '23505') { 
+      userErrorMessage = `เกิดข้อผิดพลาด: Slug "${newSlug}" นี้มีอยู่แล้วสำหรับบทความอื่น กรุณาใช้ Slug อื่น`;
     }
-    return;
+    return redirectOnError('db_error', userErrorMessage);
   }
 
-  if (!data) {
-    console.error(`[Update Action] Error: Article with ID ${articleId} not found or update failed to return data.`);
-    return;
+  if (!updatedArticleData) {
+    return redirectOnError('update_failed', 'ไม่พบบทความหลังจากการอัปเดต หรือการอัปเดตล้มเหลว');
   }
   
-  console.log('[Update Action] Article updated successfully:', data);
-
   revalidatePath('/admin/articles');
   revalidatePath('/articles');
   revalidatePath('/');
-  if (data?.slug) {
-    revalidatePath(`/articles/${data.slug}`);
+  if (currentSlugFromDb !== updatedArticleData.slug) {
+    revalidatePath(`/articles/${currentSlugFromDb}`); // Revalidate path ของ slug เก่า
   }
-  // ถ้า slug เดิมมีการเปลี่ยนแปลง อาจจะต้อง revalidate path ของ slug เก่าด้วย (ซับซ้อนขึ้นเล็กน้อย)
+  revalidatePath(`/articles/${updatedArticleData.slug}`); // Revalidate path ของ slug ใหม่
+  // (Optional) Revalidate category pages
+  if (category_id) {
+    const {data: cat} = await supabase.from('categories').select('slug').eq('id', category_id).single();
+    if (cat?.slug) revalidatePath(`/articles/category/${cat.slug}`);
+  }
 
-  redirect('/admin/articles');
+  const successMessage = 'อัปเดตบทความเรียบร้อยแล้ว!';
+  redirect(`/admin/articles?message=${encodeURIComponent(successMessage)}`);
 }
 
+// deleteArticleAction (เหมือนเดิมที่ return Promise<void>)
 export async function deleteArticleAction(articleId: number): Promise<void> {
+  // ... (โค้ด deleteArticleAction ที่สมบูรณ์แล้ว)
   if (isNaN(articleId) || articleId <= 0) {
     console.error('[Delete Action] Invalid Article ID:', articleId);
     return; 
   }
-
   const supabase = await createClient();
   const { data: articleToDelete, error: fetchError } = await supabase
     .from('articles')
     .select('slug')
     .eq('id', articleId)
     .single();
-
   if (fetchError) {
     console.warn(`[Delete Action] Could not fetch article slug (ID: ${articleId}) before delete, proceeding. Error: ${fetchError.message}`);
   }
-
-  const { error: deleteError } = await supabase
-    .from('articles')
-    .delete()
-    .eq('id', articleId);
-
+  const { error: deleteError } = await supabase.from('articles').delete().eq('id', articleId);
   if (deleteError) {
     console.error(`[Delete Action] Supabase Error deleting article (ID: ${articleId}):`, deleteError.message);
     return; 
   }
-
   console.log('[Delete Action] Article deleted successfully, ID:', articleId);
-
   revalidatePath('/admin/articles');
   revalidatePath('/articles');
   revalidatePath('/');

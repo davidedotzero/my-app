@@ -1,4 +1,5 @@
 // app/admin/articles/new/page.tsx
+import { createClient } from '@/utils/supabase/server';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { addArticleAction } from '../action';
@@ -10,19 +11,43 @@ export const metadata: Metadata = {
   description: 'สร้างบทความใหม่สำหรับเว็บไซต์บ้านไม้ดาวิ',
 };
 
+type Category = {
+  id: number;
+  name: string;
+};
+
 type AddNewArticlePageProps = {
   searchParams?: {
     error?: string;
     message?: string;
+    success?: string;
   };
 };
 
 export default async function AddNewArticlePage({ searchParams }: AddNewArticlePageProps) {
   // ดึงค่าจาก searchParams มาเก็บในตัวแปรตั้งแต่ต้น
-  const awaitedSearchParams = searchParams ? await searchParams : { error: undefined, message: undefined };
+    // ใช้ "await searchParams" ตามที่คุณเคยทดลองแล้วได้ผลกับ error ก่อนหน้า
+    const awaitedSearchParams = searchParams ? await searchParams : { 
+      error: undefined, 
+      message: undefined, 
+      success: undefined 
+    };
+    
+    // ดึงค่าจาก awaitedSearchParams ที่ผ่านการ "resolve" แล้ว
+    const errorType = awaitedSearchParams.error;
+    const message = awaitedSearchParams.message;
+    const success = awaitedSearchParams.success; // ดึง success มาด้วย
+  
+  const supabase = await createClient();
+  const { data: categories, error: categoriesError } = await supabase
+    .from('categories')
+    .select('id, name')
+    .order('name', { ascending: true });
 
-  const errorType = searchParams?.error;
-  const message = searchParams?.message;
+  if (categoriesError) {
+    console.error("Error fetching categories for new article form:", categoriesError);
+    // ควรจะแสดง UI error หรือ fallback
+  }
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -115,6 +140,25 @@ export default async function AddNewArticlePage({ searchParams }: AddNewArticleP
             className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors"
             placeholder="https://example.com/your-image.jpg"
           />
+        </div>
+
+        <div>
+          <label htmlFor="category_id" className="block text-sm font-medium text-foreground/90 mb-1.5">
+            หมวดหมู่ (Category)
+          </label>
+          <select
+            name="category_id"
+            id="category_id"
+            className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors"
+          >
+            <option value="">-- เลือกหมวดหมู่ --</option>
+            {categories?.map((category) => (
+              <option key={category.id} value={category.id.toString()}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+          {categoriesError && <p className="mt-1 text-xs text-destructive">ไม่สามารถโหลดรายการหมวดหมู่ได้</p>}
         </div>
 
         <div className="flex items-center gap-4 pt-3">
