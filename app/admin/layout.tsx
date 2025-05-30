@@ -21,6 +21,10 @@ function AdminSidebar() {
           <FileText size={18} />
           Manage Articles
         </Link>
+        <Link href="/" className="flex items-center gap-3 py-2.5 px-4 rounded-md hover:bg-slate-700 transition-colors text-sm">
+          <FileText size={18} />
+          Go to Site
+        </Link>
         {/* เพิ่ม Links สำหรับส่วน Admin อื่นๆ ที่นี่ */}
         {/* <Link href="/admin/users" className="flex items-center gap-3 py-2.5 px-4 rounded-md hover:bg-slate-700 transition-colors text-sm">
           <Users size={18} />
