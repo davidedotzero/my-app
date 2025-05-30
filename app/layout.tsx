@@ -34,14 +34,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {/* Navbar หลักของทั้งเว็บ (ถ้ามี และใช้เหมือนกันทุกส่วนจริงๆ) อาจจะอยู่นอก main ก็ได้ */}
-          {/* <GlobalNavbar /> */}
-
-          <main className="min-h-screen flex flex-col"> {/* อาจจะไม่ต้อง items-center ที่นี่ ถ้าแต่ละ layout ย่อยจัดการเอง */}
+          <main className="min-h-screen flex flex-col">
             {children}
           </main>
-
-          {/* Footer หลักของทั้งเว็บ (ถ้ามี และใช้เหมือนกันทุกส่วนจริงๆ) */}
           <footer className="w-full flex items-center justify-center border-t text-center text-xs gap-8 py-8">
             <p>
               Powered by Supabase

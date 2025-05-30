@@ -1,38 +1,50 @@
 // app/account/layout.tsx
-import Link from "next/link";
-import HeaderAuth from "@/components/header-auth"; // อาจจะใช้ HeaderAuth ร่วมกัน
+import Navbar, { type NavLinkItem } from "@/components/Navbar"; // Import Navbar และ NavLinkItem
+import HeaderAuth from "@/components/header-auth";
+import { createClient } from "@/utils/supabase/server";
+import React from 'react';
+import { UserCircle, Edit3, Lock, Settings } from 'lucide-react'; // (Optional) Icons for account nav
 
-// ไม่ต้องมี <html>, <body>, ThemeProvider, metadata ซ้ำซ้อน
+const accountNavLinks: NavLinkItem[] = [ // กำหนด Links สำหรับ Account Section
+  { href: "/account", label: "แดชบอร์ดบัญชี", icon: <UserCircle size={20}/> }, // หน้าหลักของ Account
+  { href: "/account/profile-edit", label: "แก้ไขข้อมูลส่วนตัว", icon: <Edit3 size={20}/> }, // สมมติว่าคุณจะสร้างหน้านี้
+  { href: "/account/change-password", label: "เปลี่ยนรหัสผ่าน", icon: <Lock size={20}/> }, // สมมติว่าคุณจะสร้างหน้านี้
+  // เพิ่มลิงก์อื่นๆ เช่น "ประวัติการสั่งซื้อ", "ตั้งค่าการแจ้งเตือน"
+];
 
-// ตั้งชื่อ Component ให้สื่อความหมาย
-export default function AccountLayout({
+export default async function AccountLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <>
-      <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16 sticky top-0 bg-background/95 backdrop-blur z-10">
-        <div className="w-full max-w-5xl flex justify-between items-center p-3 px-5 text-sm">
-          <div className="flex gap-5 items-center font-semibold">
-            <Link href={"/"}>กลับหน้าหลัก</Link>
-            <Link href={"/account"}>โปรไฟล์ของฉัน</Link>
-            {/* เพิ่ม Links อื่นๆ สำหรับส่วน Account เช่น ประวัติการสั่งซื้อ, ตั้งค่า */}
-          </div>
-          <HeaderAuth />
-        </div>
-      </nav>
+  const supabase = await createClient(); // ยึดตาม server.ts ของคุณ
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  // ใน AccountLayout อาจจะไม่จำเป็นต้องเช็ค isAdmin สำหรับการแสดงลิงก์ "Admin Panel" ใน Navbar
+  // เพราะ Navbar หลัก (จาก MainLayout หรือ RootLayout) ควรจะจัดการเรื่องนั้นไปแล้ว
+  // แต่ถ้า AccountLayout เป็น top-level และต้องการ Admin Link ก็ต้องดึง isAdmin มาด้วย
+  let isAdminForGlobalNav = false; // สมมติว่า user คนนี้อาจจะเป็น admin ด้วย
+   if (user) {
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (profile && profile.role === 'admin') {
+      isAdminForGlobalNav = true;
+    }
+  }
 
-      <div className="flex-1 w-full flex flex-col items-center py-8 md:py-12">
-        <div className="w-full max-w-5xl p-5 flex flex-col gap-12 md:gap-16">
-          {/* อาจจะมี Sidebar สำหรับ Account Section ด้านซ้าย และ {children} ด้านขวา */}
-          {/* <div className="flex"> */}
-          {/* <AccountSidebar /> */}
-          {/* <div className="flex-1">{children}</div> */}
-          {/* </div> */}
-          {children}
-        </div>
-      </div>
-    </>
+  const authButtonServerComponent = <HeaderAuth />;
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      <Navbar 
+        isAdmin={isAdminForGlobalNav} // ส่ง isAdmin เผื่อ Navbar มี logic แสดง "Admin Panel" link
+        authButtonSlot={authButtonServerComponent}
+        navLinks={accountNavLinks}      // <--- ส่ง accountNavLinks
+        brandName="บัญชีของฉัน"          // <--- ส่งชื่อแบรนด์สำหรับส่วนนี้
+        brandLink="/account"             // <--- ส่งลิงก์แบรนด์สำหรับส่วนนี้
+      />
+      <main className="flex-grow w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+            {children}
+      </main>
+    </div>
   );
 }
