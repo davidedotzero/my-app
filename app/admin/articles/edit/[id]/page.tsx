@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-// ควรย้าย generateSlug ไปไว้ใน utils/slugify.ts หรือ actions.ts เพื่อใช้ร่วมกัน
+// Helper function สำหรับสร้าง slug (ควรจะอยู่ในไฟล์ utils หรือ actions.ts เพื่อใช้ร่วมกัน)
 function generateSlug(title: string): string {
   if (!title) return '';
   return title
@@ -22,7 +22,7 @@ async function updateArticleAction(articleId: number, currentSlugFromDb: string,
   'use server';
 
   const title = formData.get('title') as string;
-  let newSlug = formData.get('slug') as string; // ผู้ใช้อาจจะแก้ไข slug
+  let newSlug = formData.get('slug') as string;
   const excerpt = formData.get('excerpt') as string | null;
   const content = formData.get('content') as string;
   const imageUrl = formData.get('image_url') as string | null;
@@ -38,14 +38,17 @@ async function updateArticleAction(articleId: number, currentSlugFromDb: string,
 
   if (!newSlug) {
     newSlug = generateSlug(title);
-    if (!newSlug) {
-      console.error('[Update Action] Validation Error: Cannot generate slug from empty title.');
-      return redirectOnError('slug_generation_failed', 'ไม่สามารถสร้าง slug จากหัวข้อได้ กรุณาใส่หัวข้อหรือ slug เอง');
+    if (!newSlug && title) { // ถ้า title มีค่า แต่ newSlug ยังว่าง (เช่น title มีแต่อักขระพิเศษ)
+        console.error('[Update Action] Validation Error: Cannot generate slug from title. Please provide a valid slug.');
+        return redirectOnError('slug_generation_failed', 'ไม่สามารถสร้าง slug จากหัวข้อที่ระบุได้ กรุณากรอก Slug เอง');
+    } else if (!newSlug && !title) { // ถ้า title ว่างด้วย
+        console.error('[Update Action] Validation Error: Cannot generate slug from empty title.');
+        return redirectOnError('slug_generation_failed', 'ไม่สามารถสร้าง slug จากหัวข้อได้ กรุณาใส่หัวข้อหรือ slug เอง');
     }
   } else {
     newSlug = generateSlug(newSlug); // Clean slug ที่ผู้ใช้กรอก
   }
-
+  
   const supabase = await createClient();
   const { data: updatedArticleData, error: dbError } = await supabase
     .from('articles')
@@ -55,37 +58,34 @@ async function updateArticleAction(articleId: number, currentSlugFromDb: string,
       excerpt: excerpt?.trim() || null,
       content: content.trim(),
       image_url: imageUrl?.trim() || null,
-      // updated_at จะถูกอัปเดตโดย DB trigger
     })
     .eq('id', articleId)
-    .select('slug') // ดึง slug ที่อัปเดตแล้วกลับมาเพื่อ revalidate
+    .select('slug')
     .single();
 
   if (dbError) {
     console.error(`[Update Action] Supabase Error updating article (ID: ${articleId}):`, dbError);
     let userErrorMessage = `เกิดข้อผิดพลาดในการอัปเดตบทความ: ${dbError.message}`;
-    if (dbError.code === '23505') { // Unique constraint violation
+    if (dbError.code === '23505') {
       userErrorMessage = `เกิดข้อผิดพลาด: Slug "${newSlug}" นี้มีอยู่แล้วสำหรับบทความอื่น กรุณาใช้ Slug อื่น`;
     }
     return redirectOnError('db_error', userErrorMessage);
   }
 
   if (!updatedArticleData) {
-    console.error(`[Update Action] Error: Article with ID ${articleId} not found or update failed.`);
-    return redirectOnError('update_failed', 'ไม่พบข้อมูลบทความหลังจากการอัปเดต');
+    console.error(`[Update Action] Error: Article with ID ${articleId} not found after update or update failed.`);
+    return redirectOnError('update_failed', 'ไม่พบข้อมูลบทความหลังจากการอัปเดต หรือการอัปเดตล้มเหลว');
   }
   
   console.log('[Update Action] Article updated successfully. New slug:', updatedArticleData.slug);
 
   revalidatePath('/admin/articles');
-  revalidatePath('/articles'); // หน้ารวมบทความสาธารณะ
-  revalidatePath('/');       // หน้าแรก
+  revalidatePath('/articles');
+  revalidatePath('/');
 
-  // Revalidate หน้าบทความสาธารณะของ slug เก่า (ถ้ามีการเปลี่ยนแปลง slug)
   if (currentSlugFromDb !== updatedArticleData.slug) {
     revalidatePath(`/articles/${currentSlugFromDb}`);
   }
-  // Revalidate หน้าบทความสาธารณะของ slug ใหม่
   revalidatePath(`/articles/${updatedArticleData.slug}`);
 
   const successMessage = 'อัปเดตบทความเรียบร้อยแล้ว!';
@@ -96,16 +96,18 @@ type EditArticlePageProps = {
   params: {
     id: string; 
   };
-  searchParams?: { // เพิ่ม searchParams สำหรับรับ error/success message
+  searchParams?: {
     error?: string;
     message?: string;
   };
 };
 
 export async function generateMetadata({ params }: EditArticlePageProps): Promise<Metadata> {
-  const articleId = parseInt(params.id, 10);
+  const awaitedParams = await params; // <--- เพิ่ม await params
+  const articleId = parseInt(awaitedParams.id, 10);
+
   if (isNaN(articleId)) {
-    return { title: 'ID บทความไม่ถูกต้อง | Admin' };
+    return { title: 'ID บทความไม่ถูกต้อง | Admin Dashboard' };
   }
 
   const supabase = await createClient();
@@ -121,7 +123,12 @@ export async function generateMetadata({ params }: EditArticlePageProps): Promis
 }
 
 export default async function EditArticlePage({ params, searchParams }: EditArticlePageProps) {
-  const articleId = parseInt(params.id, 10);
+  const awaitedParams = await params; // <--- เพิ่ม await params
+  const resolvedSearchParams = searchParams ? await searchParams : { error: undefined, message: undefined }; // <--- เพิ่ม await searchParams
+
+  const articleId = parseInt(awaitedParams.id, 10);
+  const errorType = resolvedSearchParams.error;
+  const message = resolvedSearchParams.message;
 
   if (isNaN(articleId)) {
     notFound();
@@ -139,7 +146,6 @@ export default async function EditArticlePage({ params, searchParams }: EditArti
     notFound();
   }
 
-  // ผูก articleId และ article.slug (slug ปัจจุบัน) เข้ากับ server action
   const updateActionWithParams = updateArticleAction.bind(null, article.id, article.slug);
 
   return (
@@ -154,10 +160,10 @@ export default async function EditArticlePage({ params, searchParams }: EditArti
         แก้ไขบทความ: <span className="text-primary/90">{article.title}</span>
       </h1>
 
-      {searchParams?.error && (
+      {errorType && message && (
         <div className="mb-6 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive text-sm">
           <p className="font-semibold">เกิดข้อผิดพลาด:</p>
-          <p>{searchParams.message || 'ข้อมูลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง'}</p>
+          <p>{message}</p>
         </div>
       )}
 
@@ -178,15 +184,15 @@ export default async function EditArticlePage({ params, searchParams }: EditArti
 
         <div>
           <label htmlFor="slug" className="block text-sm font-medium text-foreground/90 mb-1.5">
-            Slug (สำหรับ URL) <span className="text-destructive">*</span>
+            Slug (สำหรับ URL)
           </label>
           <input
             type="text"
             name="slug"
             id="slug"
-            required
             defaultValue={article.slug}
             className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors"
+            placeholder="ปล่อยว่างเพื่อสร้างจากหัวข้อ หรือกรอกเอง"
           />
           <p className="mt-1.5 text-xs text-muted-foreground">
             ถ้ามีการเปลี่ยนแปลง จะส่งผลต่อ URL ของบทความนี้ (ใช้ตัวอักษรภาษาอังกฤษตัวเล็ก, ตัวเลข, และขีดกลาง)

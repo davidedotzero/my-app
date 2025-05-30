@@ -5,14 +5,29 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 
 function generateSlug(title: string): string {
-  if (!title) return '';
-  return title
+  if (!title) return `article-${Date.now().toString().slice(-6)}`; // fallback ถ้า title ว่าง
+
+  let slug = title
     .toLowerCase()
+    .trim()
+    // แทนที่อักขระไทยด้วย '' หรือคุณอาจจะหา library สำหรับ transliterate
+    // สำหรับตอนนี้ เราจะลบอักขระที่ไม่ใช่ alphanumeric ภาษาอังกฤษออกไปก่อน
+    // ซึ่งจะทำให้ slug จากภาษาไทยล้วนๆ เป็นค่าว่าง
+    .replace(/[\u0E00-\u0E7F]+/g, '') // ลบอักขระภาษาไทย
     .replace(/\s+/g, '-')
     .replace(/[^\w-]+/g, '')
     .replace(/--+/g, '-')
     .replace(/^-+/, '')
     .replace(/-+$/, '');
+
+  if (!slug) {
+    // ถ้า slug ยังคงว่างเปล่า (เช่น title เป็นภาษาไทยล้วน)
+    // ให้สร้าง slug จากส่วนหนึ่งของ timestamp หรือ ID (ถ้ามี)
+    // หรืออาจจะให้ผู้ใช้กรอก slug ภาษาอังกฤษเองเป็นภาคบังคับถ้า title เป็นภาษาไทย
+    // ตัวอย่าง: ใช้ส่วนหนึ่งของ timestamp
+    return `article-${Date.now().toString().slice(-6)}`;
+  }
+  return slug;
 }
 
 export async function addArticleAction(formData: FormData) {
@@ -30,15 +45,16 @@ export async function addArticleAction(formData: FormData) {
     return redirect(`/admin/articles/new?error=validation_failed&message=${encodeURIComponent(message)}`); // <--- ใช้ encodeURIComponent
   }
 
-  if (!slug) {
-    slug = generateSlug(title); // สมมติว่าคุณมีฟังก์ชัน generateSlug
-    if (!slug) {
-        console.error('[Add Action] Validation Error: Cannot generate slug from empty title.');
-        const message = 'ไม่สามารถสร้าง slug จากหัวข้อได้ กรุณาใส่หัวข้อหรือ slug เอง';
-        return redirect(`/admin/articles/new?error=slug_generation_failed&message=${encodeURIComponent(message)}`); // <--- ใช้ encodeURIComponent
+  if (!slug) { // สมมติว่า slug จากฟอร์มชื่อ slugFromForm
+    slug = generateSlug(title);
+    if (!slug.startsWith('article-') && slug === generateSlug('')) { // ตรวจสอบว่า slug ที่ได้มาไม่ได้มาจาก fallback ของ title ว่างเปล่าจริงๆ
+        console.error('[Action] Validation Error: Slug is required or title is invalid for auto-generation.');
+        // ควรจะแจ้งให้ผู้ใช้กรอก slug ภาษาอังกฤษเองถ้า title เป็นภาษาไทยล้วนและไม่ได้ตั้งใจให้เป็น article-xxxxxx
+        const message = 'หัวข้อเป็นภาษาไทยล้วน กรุณากรอก Slug เป็นภาษาอังกฤษ หรือเว้นว่างเพื่อให้ระบบสร้าง Slug อัตโนมัติ (อาจจะไม่สื่อความหมาย)';
+        return redirect(`/admin/articles/new?error=slug_required_for_thai_title&message=${encodeURIComponent(message)}`);
     }
   } else {
-    slug = generateSlug(slug);
+    slug = generateSlug(slug); // Clean slug ที่ผู้ใช้กรอก
   }
 
   const supabase = await createClient();
@@ -94,14 +110,26 @@ export async function updateArticleAction(articleId: number, formData: FormData)
     return;
   }
 
-  if (!slug) {
+  // if (!slug) {
+  //   slug = generateSlug(title);
+  //    if (!slug) {
+  //       console.error('[Update Action] Validation Error: Cannot generate slug from empty title.');
+  //       return;
+  //   }
+  // } else {
+  //   slug = generateSlug(slug); // Clean a user-provided slug
+  // }
+
+  if (!slug) { // สมมติว่า slug จากฟอร์มชื่อ slugFromForm
     slug = generateSlug(title);
-     if (!slug) {
-        console.error('[Update Action] Validation Error: Cannot generate slug from empty title.');
-        return;
+    if (!slug.startsWith('article-') && slug === generateSlug('')) { // ตรวจสอบว่า slug ที่ได้มาไม่ได้มาจาก fallback ของ title ว่างเปล่าจริงๆ
+        console.error('[Action] Validation Error: Slug is required or title is invalid for auto-generation.');
+        // ควรจะแจ้งให้ผู้ใช้กรอก slug ภาษาอังกฤษเองถ้า title เป็นภาษาไทยล้วนและไม่ได้ตั้งใจให้เป็น article-xxxxxx
+        const message = 'หัวข้อเป็นภาษาไทยล้วน กรุณากรอก Slug เป็นภาษาอังกฤษ หรือเว้นว่างเพื่อให้ระบบสร้าง Slug อัตโนมัติ (อาจจะไม่สื่อความหมาย)';
+        return redirect(`/admin/articles/new?error=slug_required_for_thai_title&message=${encodeURIComponent(message)}`);
     }
   } else {
-    slug = generateSlug(slug); // Clean a user-provided slug
+    slug = generateSlug(slug); // Clean slug ที่ผู้ใช้กรอก
   }
 
   const supabase = await createClient();

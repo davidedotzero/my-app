@@ -19,6 +19,8 @@ type AddNewArticlePageProps = {
 
 export default async function AddNewArticlePage({ searchParams }: AddNewArticlePageProps) {
   // ดึงค่าจาก searchParams มาเก็บในตัวแปรตั้งแต่ต้น
+  const awaitedSearchParams = searchParams ? await searchParams : { error: undefined, message: undefined };
+
   const errorType = searchParams?.error;
   const message = searchParams?.message;
 
