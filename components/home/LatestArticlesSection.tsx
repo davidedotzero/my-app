@@ -16,7 +16,7 @@ export default async function LatestArticlesSection() {
     .from('articles')
     .select('id, title, slug, excerpt, image_url')
     .order('created_at', { ascending: false })
-    .limit(3)
+    .limit(6)
     .returns<Article[]>();
 
   if (error) {
@@ -46,24 +46,24 @@ export default async function LatestArticlesSection() {
   }
 
   return (
-    <section className="py-12 md:py-16 bg-primary-foreground dark:bg-slate-800">
+    <section className="py-12 md:py-16 bg-white border-2">
       <div className="container mx-auto px-6">
-        <h2 className="text-3xl md:text-4xl font-semibold text-center text-green-800 dark:text-green-300 mb-8 md:mb-12">
-          Latest
+        <h2 className="text-3xl md:text-4xl font-semibold text-center text-primary mb-8 md:mb-12">
+          บทความล่าสุด
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {articles.map((article) => (
-            <div key={article.id} className="bg-white dark:bg-slate-700 p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
+            <div key={article.id} className="bg-white p-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 flex flex-col">
               {article.image_url && (
                 <div className="mb-4 h-40 w-full overflow-hidden rounded-md">
                   <img src={article.image_url} alt={article.title} className="w-full h-full object-cover" />
                 </div>
               )}
-              <h3 className="text-xl font-semibold text-green-700 dark:text-green-300 mb-3">{article.title}</h3>
+              <h3 className="text-xl font-semibold text-primary mb-3">{article.title}</h3>
               <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm leading-relaxed flex-grow">{article.excerpt || ''}</p>
               <Link
                 href={`/articles/${article.slug}`}
-                className="inline-block self-start mt-auto text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200 font-medium transition-colors duration-300"
+                className="inline-block self-start mt-auto text-primary hover:text-primary-foreground font-medium transition-colors duration-300"
               >
                 อ่านต่อ &rarr;
               </Link>
@@ -73,7 +73,7 @@ export default async function LatestArticlesSection() {
         <div className="text-center mt-10 md:mt-14">
           <Link
             href="/articles"
-            className="bg-green-600 dark:bg-green-700 text-white px-8 py-3 rounded-md hover:bg-green-700 dark:hover:bg-green-600 transition-colors duration-300 text-lg"
+            className="bg-primary dark:bg-primary text-white px-8 py-3 rounded-md hover:bg-primary-foreground dark:hover:bg-primary-foreground hover:text-primary transition-colors duration-300 text-lg"
           >
             ดูบทความทั้งหมด
           </Link>
