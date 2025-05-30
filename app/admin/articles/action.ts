@@ -146,21 +146,22 @@ export async function updateArticleAction(articleId: number, formData: FormData)
   redirect('/admin/articles');
 }
 
-export async function deleteArticleAction(articleId: number): Promise<{ success?: string; error?: string }> {
+export async function deleteArticleAction(articleId: number): Promise<void> {
   if (isNaN(articleId) || articleId <= 0) {
-    console.error('[Delete Action] Invalid Article ID.');
-    return { error: 'ID บทความไม่ถูกต้อง' };
+    console.error('[Delete Action] Invalid Article ID:', articleId);
+    return; 
   }
 
   const supabase = await createClient();
   const { data: articleToDelete, error: fetchError } = await supabase
     .from('articles')
-    .select('slug') // ดึง slug มาเพื่อ revalidate path ของบทความนั้นๆ
+    .select('slug')
     .eq('id', articleId)
     .single();
 
-  // ไม่จำเป็นต้องหยุดถ้า fetchError เพราะเป้าหมายหลักคือการลบ
-  // แต่การ log error ไว้ก็ดี
+  if (fetchError) {
+    console.warn(`[Delete Action] Could not fetch article slug (ID: ${articleId}) before delete, proceeding. Error: ${fetchError.message}`);
+  }
 
   const { error: deleteError } = await supabase
     .from('articles')
@@ -168,18 +169,16 @@ export async function deleteArticleAction(articleId: number): Promise<{ success?
     .eq('id', articleId);
 
   if (deleteError) {
-    console.error(`[Delete Action] Supabase Error deleting article (ID: ${articleId}):`, deleteError);
-    return { error: `ไม่สามารถลบบทความได้: ${deleteError.message}` };
+    console.error(`[Delete Action] Supabase Error deleting article (ID: ${articleId}):`, deleteError.message);
+    return; 
   }
 
   console.log('[Delete Action] Article deleted successfully, ID:', articleId);
 
-  revalidatePath('/admin/articles'); // Revalidate หน้ารายการ Admin
-  revalidatePath('/articles');       // Revalidate หน้ารวมบทความสาธารณะ (ถ้ามี)
-  revalidatePath('/');               // Revalidate หน้าแรก (ถ้าแสดงบทความล่าสุด)
+  revalidatePath('/admin/articles');
+  revalidatePath('/articles');
+  revalidatePath('/');
   if (articleToDelete?.slug) {
-    revalidatePath(`/articles/${articleToDelete.slug}`); // Revalidate หน้าสาธารณะของบทความที่ถูกลบ
+    revalidatePath(`/articles/${articleToDelete.slug}`);
   }
-  
-  return { success: 'ลบบทความเรียบร้อยแล้ว!' };
 }

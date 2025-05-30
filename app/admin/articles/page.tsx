@@ -73,30 +73,7 @@ export default async function ManageArticlesPage() {
                     <Link href={`/admin/articles/edit/${article.id}`} className="inline-block text-amber-600 hover:text-amber-800 p-1.5 rounded hover:bg-amber-500/10" title="แก้ไข">
                       <Edit3 size={16} />
                     </Link>
-                    <form 
-                      action={async () => { // ใช้ async wrapper สำหรับ Server Action ที่ return ค่า
-                        'use server'; // ระบุอีกครั้งถ้า action ถูก define ในไฟล์อื่นและเรียกแบบ inline
-                        if (!confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบบทความ "${article.title}"? การกระทำนี้ไม่สามารถย้อนกลับได้`)) {
-                          return;
-                        }
-                        const result = await deleteArticleAction(article.id);
-                        if (result.error) {
-                          alert(`เกิดข้อผิดพลาด: ${result.error}`); // แสดง alert แบบง่าย
-                        } else if (result.success) {
-                          alert(result.success); // แสดง alert แบบง่าย
-                          // ไม่ต้อง redirect ที่นี่ เพราะ revalidatePath ควรจะ refresh list แล้ว
-                        }
-                      }} 
-                      className="inline-block"
-                    >
-                      <button 
-                        type="submit"
-                        className="text-destructive hover:text-destructive/80 p-1.5 rounded hover:bg-destructive/10" 
-                        title="ลบ"
-                      >
-                        <DeleteArticleButton articleId={article.id} articleTitle={article.title} />
-                      </button>
-                    </form>
+                    <DeleteArticleButton articleId={article.id} articleTitle={article.title} />
                   </td>
                 </tr>
               ))}
