@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { FilePlus2, Eye, Edit3, Trash2 } from 'lucide-react'; // Icons
+import DeleteProductButton from '@/components/admin/products/DeleteProductButton';
 
 type Product = {
   id: number;
@@ -88,6 +89,15 @@ export default async function ManageProductsPage({ searchParams }: ManageProduct
                     </Link>
                     {/* <DeleteProductButton productId={product.id} productName={product.name} /> */}
                   </td>
+                  <td className="px-6 py-4 text-right space-x-1 whitespace-nowrap">
+                    <Link href={`/creations/${product.product_type || 'all'}/${product.slug}`} target="_blank" className="inline-block text-blue-600 hover:text-blue-800 p-1.5 rounded hover:bg-blue-500/10" title="ดูหน้าเว็บจริง">
+                      <Eye size={16} />
+                    </Link>
+                    <Link href={`/admin/products/edit/${product.id}`} className="inline-block text-amber-600 hover:text-amber-800 p-1.5 rounded hover:bg-amber-500/10" title="แก้ไข">
+                      <Edit3 size={16} />
+                    </Link>
+                    <DeleteProductButton productId={product.id} productName={product.name} />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -100,7 +110,9 @@ export default async function ManageProductsPage({ searchParams }: ManageProduct
             คลิกที่นี่เพื่อเริ่มเพิ่มสินค้าชิ้นแรก!
           </Link>
         </div>
+        
       )}
+      
     </div>
   );
 }
