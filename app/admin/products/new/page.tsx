@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { addProductAction } from '@/app/admin/products/actions'; // Import Server Action
+import { addProductAction } from '@/app/admin/products/actions'; // ตรวจสอบว่า path นี้ถูกต้อง ถ้า actions.ts อยู่ในโฟลเดอร์เดียวกัน
 
 export const metadata: Metadata = {
   title: 'เพิ่มสินค้าใหม่ | Admin Dashboard',
@@ -11,20 +11,21 @@ type AddNewProductPageProps = {
   searchParams?: {
     error?: string;
     message?: string;
-    field?: string;
+    field?: string; // สำหรับ error เฉพาะ field
     success?: string;
   };
 };
 
 export default async function AddNewProductPage({ searchParams }: AddNewProductPageProps) {
+  // ใช้ await searchParams ถ้าคุณเคยเจอปัญหาและวิธีนี้แก้ได้
   const awaitedSearchParams = searchParams ? await searchParams : {};
   const errorType = awaitedSearchParams.error;
   const message = awaitedSearchParams.message;
-  const fieldError = awaitedSearchParams.field;
+  const fieldError = awaitedSearchParams.field; // field ที่มีปัญหา (ถ้ามี)
   const success = awaitedSearchParams.success;
 
-  // (Optional) ดึง Product Types มาสำหรับ Dropdown ถ้าต้องการ
-  // const productTypes = ["bonsai", "zen-garden", "terrarium"]; // หรือดึงจาก DB ถ้ามีตารางแยก
+  // (Optional) ดึง Product Types มาสำหรับ Dropdown ถ้าต้องการ (เช่น จาก DB)
+  // const productTypes = ["bonsai", "zen-garden", "terrarium"];
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -73,7 +74,6 @@ export default async function AddNewProductPage({ searchParams }: AddNewProductP
             <option value="bonsai">บอนไซ (Bonsai)</option>
             <option value="zen-garden">สวนหินเซน (Zen Garden)</option>
             <option value="terrarium">สวนในขวดแก้ว (Terrarium)</option>
-            {/* (Optional) ดึงมาจากตาราง product_categories ถ้ามี */}
           </select>
         </div>
 
@@ -81,7 +81,7 @@ export default async function AddNewProductPage({ searchParams }: AddNewProductP
           <label htmlFor="price" className="block text-sm font-medium text-foreground/90 mb-1.5">
             ราคา (บาท) <span className="text-destructive">*</span>
           </label>
-          <input type="number" name="price" id="price" required step="0.01" min="0" className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors" placeholder="เช่น 1500.00" />
+          <input type="number" name="price" id="price" required step="0.01" min="0" className={`w-full p-3 border rounded-lg shadow-sm focus:ring-2 focus:border-primary bg-background text-foreground text-sm transition-colors ${fieldError === 'price' ? 'border-destructive focus:ring-destructive' : 'border-input focus:ring-primary'}`} placeholder="เช่น 1500.00" />
           {fieldError === 'price' && message && <p className="mt-1 text-xs text-destructive">{decodeURIComponent(message)}</p>}
         </div>
         
@@ -93,10 +93,16 @@ export default async function AddNewProductPage({ searchParams }: AddNewProductP
         </div>
 
         <div>
-          <label htmlFor="image_url" className="block text-sm font-medium text-foreground/90 mb-1.5">
-            URL รูปภาพหลัก
+          <label htmlFor="image_file" className="block text-sm font-medium text-foreground/90 mb-1.5">
+            รูปภาพหลัก (Main Image)
           </label>
-          <input type="url" name="image_url" id="image_url" className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors" placeholder="https://example.com/main-product-image.jpg" />
+          <input
+            type="file"
+            name="image_file" // <--- *** แก้ไขชื่อ name ตรงนี้ให้เป็น "image_file" ***
+            id="image_file"    // id สามารถเป็น "image_file" หรือ "productsimages" ก็ได้ แต่ name สำคัญกว่าสำหรับ formData
+            accept="image/png, image/jpeg, image/webp, image/gif"
+            className="w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary dark:file:bg-primary/20 dark:file:text-primary hover:file:bg-primary/20 dark:hover:file:bg-primary/30 cursor-pointer border border-input rounded-lg focus-within:ring-2 focus-within:ring-primary focus-within:border-primary"
+          />
         </div>
 
         <div>

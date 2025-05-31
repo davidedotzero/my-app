@@ -1,8 +1,32 @@
+// app/admin/products/edit/[id]/page.tsx
 import { createClient } from '@/utils/supabase/server';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation'; // redirect ถูกใช้ใน action ไม่ใช่ใน page component โดยตรง
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { updateProductAction } from '../../actions'; // Import Server Action
+import Image from 'next/image';
+// ปรับ Path การ import นี้ให้ถูกต้องตามตำแหน่งไฟล์ actions.ts ของคุณ
+// ถ้า actions.ts อยู่ใน app/admin/products/actions.ts ให้ใช้ import { updateProductAction } from '../actions';
+// ถ้า actions.ts อยู่ใน app/admin/actions.ts ให้ใช้ import { updateProductAction } from '../../actions';
+import { updateProductAction } from '../../actions'; 
+
+// Helper function สำหรับสร้าง slug (ควรจะอยู่ในไฟล์ utils หรือ actions.ts เพื่อใช้ร่วมกัน)
+// function generateSlug(title: string): string {
+//   if (!title?.trim()) return `product-${Date.now().toString().slice(-6)}`;
+//   let slug = title
+//     .toLowerCase()
+//     .trim()
+//     .replace(/[\u0E00-\u0E7F]+/g, '') // ลบอักขระภาษาไทย
+//     .replace(/\s+/g, '-')
+//     .replace(/[^\w-]+/g, '')
+//     .replace(/--+/g, '-')
+//     .replace(/^-+/, '')
+//     .replace(/-+$/, '');
+//   if (!slug) {
+//     return `product-${Date.now().toString().slice(-7)}`;
+//   }
+//   return slug;
+// }
+// หมายเหตุ: ถ้า generateSlug อยู่ใน actions.ts แล้ว ไม่ต้องประกาศซ้ำที่นี่
 
 type EditProductPageProps = {
   params: {
@@ -12,10 +36,10 @@ type EditProductPageProps = {
     error?: string;
     message?: string;
     field?: string;
+    success?: string; 
   };
 };
 
-// Type สำหรับ Product (ควรจะมาจากไฟล์ types กลาง)
 type Product = {
   id: number;
   name: string;
@@ -25,53 +49,85 @@ type Product = {
   image_url: string | null;
   images: string[] | null;
   product_type: string | null;
+  category_id: number | null; 
   stock_quantity: number | null;
-  // เพิ่มฟิลด์อื่นๆ ตาม schema ของคุณ
+  created_at: string;
+  updated_at: string;
+};
+
+type Category = {
+  id: number;
+  name: string;
 };
 
 export async function generateMetadata({ params }: EditProductPageProps): Promise<Metadata> {
-  // ใช้ await params ถ้าจำเป็นสำหรับ environment ของคุณ
-  const awaitedParams = params ? await params : { id: '' };
+  const awaitedParams = params ? await params : { id: '' }; // ใช้ await params ตามที่คุณทดลอง
   const productId = parseInt(awaitedParams.id, 10);
 
   if (isNaN(productId)) {
-    return { title: 'ID สินค้าไม่ถูกต้อง | Admin' };
+    return { title: 'ID สินค้าไม่ถูกต้อง | Admin Dashboard' };
   }
-  const supabase = await createClient();
-  const { data: product } = await supabase.from('products').select('name').eq('id', productId).single();
+
+  const supabase = await createClient(); // ใช้ await ถ้า createClient เป็น async
+  const { data: product } = await supabase
+    .from('products')
+    .select('name')
+    .eq('id', productId)
+    .single();
+
   return {
-    title: product ? `แก้ไขสินค้า: ${product.name} | Admin` : 'แก้ไขสินค้า | Admin',
+    title: product ? `แก้ไขสินค้า: ${product.name} | Admin Dashboard` : 'แก้ไขสินค้า | Admin Dashboard',
   };
 }
 
 export default async function EditProductPage({ params, searchParams }: EditProductPageProps) {
-  const awaitedParams = params ? await params : { id: '' };
-  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const awaitedParams = params ? await params : { id: '' }; // ใช้ await params
+  const resolvedSearchParams = searchParams ? await searchParams : { 
+    error: undefined, 
+    message: undefined, 
+    field: undefined,
+    success: undefined
+  }; // ใช้ await searchParams
   
   const productId = parseInt(awaitedParams.id, 10);
   const errorType = resolvedSearchParams.error;
-  const message = resolvedSearchParams.message;
+  const queryMessage = resolvedSearchParams.message; // เปลี่ยนชื่อตัวแปรไม่ให้ซ้ำกับ message ใน scope อื่น
   const fieldError = resolvedSearchParams.field;
+  const successMessage = resolvedSearchParams.success ? resolvedSearchParams.message : null;
 
 
   if (isNaN(productId)) {
     notFound();
   }
 
-  const supabase = await createClient();
+  const supabase = await createClient(); // ใช้ await ถ้า createClient เป็น async
+
   const { data: product, error: fetchError } = await supabase
     .from('products')
-    .select('*')
+    .select('*') 
     .eq('id', productId)
     .single<Product>();
+
+  const { data: categories, error: categoriesError } = await supabase
+    .from('categories') 
+    .select('id, name')
+    .order('name', { ascending: true });
 
   if (fetchError || !product) {
     console.error(`Error fetching product (ID: ${productId}) for edit:`, fetchError);
     notFound();
   }
 
-  // ผูก productId และ product.slug (slug ปัจจุบัน) เข้ากับ server action
-  const updateActionWithParams = updateProductAction.bind(null, product.id, product.slug);
+  // Server Action updateProductAction ควรจะรับ (productId: number, currentSlugFromDb: string, currentProductType: string | null, formData: FormData)
+  const updateActionWithParams = updateProductAction.bind(
+    null, 
+    product.id, 
+    product.slug, // currentProductSlugFromDb
+    product.product_type // currentProductType
+  );
+  
+  // จุดนี้คือจุดสิ้นสุดของ Logic ใน JavaScript ก่อนเริ่มส่วน JSX ของ return
+  // ตรวจสอบให้แน่ใจว่าไม่มี Syntax Error ใดๆ ก่อนบรรทัด return (...)
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -85,14 +141,21 @@ export default async function EditProductPage({ params, searchParams }: EditProd
         แก้ไขสินค้า: <span className="text-primary/90">{product.name}</span>
       </h1>
 
-      {errorType && message && (
+      {successMessage && (
+        <div className="mb-6 p-3 rounded-md bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-300 text-sm">
+          <p>{decodeURIComponent(successMessage)}</p>
+        </div>
+      )}
+      {errorType && queryMessage && (
         <div className="mb-6 p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive text-sm">
           <p className="font-semibold">เกิดข้อผิดพลาด:</p>
-          <p>{decodeURIComponent(message)}</p>
+          <p>{decodeURIComponent(queryMessage)}</p>
         </div>
       )}
 
       <form action={updateActionWithParams} className="space-y-6 bg-card p-6 md:p-8 rounded-xl shadow-lg border border-border">
+        <input type="hidden" name="current_image_url" value={product.image_url || ''} />
+        
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-foreground/90 mb-1.5">
             ชื่อสินค้า <span className="text-destructive">*</span>
@@ -124,8 +187,8 @@ export default async function EditProductPage({ params, searchParams }: EditProd
           <label htmlFor="price" className="block text-sm font-medium text-foreground/90 mb-1.5">
             ราคา (บาท) <span className="text-destructive">*</span>
           </label>
-          <input type="number" name="price" id="price" required step="0.01" min="0" defaultValue={product.price} className={`w-full p-3 border rounded-lg shadow-sm focus:ring-2 focus:border-primary bg-background text-foreground text-sm transition-colors ${fieldError === 'price' ? 'border-destructive focus:ring-destructive' : 'border-input focus:ring-primary'}`} />
-          {fieldError === 'price' && message && <p className="mt-1 text-xs text-destructive">{decodeURIComponent(message)}</p>}
+          <input type="number" name="price" id="price" required step="0.01" min="0" defaultValue={product.price} className={`w-full p-3 border rounded-lg shadow-sm focus:ring-2 focus:border-primary bg-background text-foreground text-sm transition-colors ${fieldError === 'price' && errorType ? 'border-destructive focus:ring-destructive' : 'border-input focus:ring-primary'}`} />
+          {fieldError === 'price' && errorType && queryMessage && <p className="mt-1 text-xs text-destructive">{decodeURIComponent(queryMessage)}</p>}
         </div>
         
         <div>
@@ -136,10 +199,11 @@ export default async function EditProductPage({ params, searchParams }: EditProd
         </div>
 
         <div>
-          <label htmlFor="image_url" className="block text-sm font-medium text-foreground/90 mb-1.5">
-            URL รูปภาพหลัก
+          <label htmlFor="image_file" className="block text-sm font-medium text-foreground/90 mb-1.5">
+            รูปภาพหลัก (เลือกไฟล์ใหม่ถ้าต้องการเปลี่ยน)
           </label>
-          <input type="url" name="image_url" id="image_url" defaultValue={product.image_url || ''} className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors" />
+          <input type="file" name="image_file" id="image_file" accept="image/png, image/jpeg, image/webp, image/gif" className="w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary dark:file:bg-primary/20 dark:file:text-primary hover:file:bg-primary/20 dark:hover:file:bg-primary/30 cursor-pointer border border-input rounded-lg focus-within:ring-2 focus-within:ring-primary focus-within:border-primary"/>
+          {product.image_url && ( <div className="mt-3"><p className="text-xs text-muted-foreground mb-1">รูปภาพปัจจุบัน:</p><Image src={product.image_url} alt={`รูปภาพปัจจุบันของ ${product.name}`} width={100} height={100} className="object-cover rounded-md border border-border" /></div>)}
         </div>
 
         <div>
@@ -153,7 +217,32 @@ export default async function EditProductPage({ params, searchParams }: EditProd
           <label htmlFor="stock_quantity" className="block text-sm font-medium text-foreground/90 mb-1.5">
             จำนวนในสต็อก
           </label>
-          <input type="number" name="stock_quantity" id="stock_quantity" min="0" step="1" defaultValue={product.stock_quantity ?? 0} className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors"/>
+          <input type="number" name="stock_quantity" id="stock_quantity" min="0" step="1" defaultValue={product.stock_quantity ?? 0} className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors" />
+        </div>
+
+        <div>
+          <label htmlFor="category_id" className="block text-sm font-medium text-foreground/90 mb-1.5">
+            หมวดหมู่บทความ (Category) 
+            {/* หมายเหตุ: นี่คือ "หมวดหมู่บทความ" ซึ่งอาจจะไม่ตรงกับ "ประเภทสินค้า" (product_type) 
+                ถ้าคุณต้องการให้สินค้ามี category แยกจาก product_type คุณต้องมีคอลัมน์ category_id ในตาราง products
+                และดึง categories มาแสดงใน dropdown นี้
+                จากโค้ดเดิมของคุณ คุณใช้ product.category_id สำหรับ defaultValue ซึ่งถูกต้องถ้ามีคอลัมน์นี้
+            */}
+          </label>
+          <select
+            name="category_id" // Server Action จะรับค่านี้
+            id="category_id"
+            defaultValue={product.category_id?.toString() || ""} // ใช้ product.category_id (ถ้ามี)
+            className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors"
+          >
+            <option value="">-- ไม่ระบุหมวดหมู่ --</option>
+            {categories?.map((category) => ( // categories ที่ดึงมาจาก DB สำหรับ dropdown
+              <option key={category.id} value={category.id.toString()}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+          {categoriesError && <p className="mt-1 text-xs text-destructive">ไม่สามารถโหลดรายการหมวดหมู่ได้</p>}
         </div>
 
         <div className="flex items-center gap-4 pt-3">
