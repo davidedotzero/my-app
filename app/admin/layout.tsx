@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Home, FileText, Settings, Users } from 'lucide-react'; // ตัวอย่าง Icons
+import { Home, FileText, Settings, Users, ShoppingBag } from 'lucide-react'; // ตัวอย่าง Icons
 
 function AdminSidebar() {
   return (
@@ -34,7 +34,10 @@ function AdminSidebar() {
           <Settings size={18} />
           Manage Categories
         </Link>
-
+        <Link href="/admin/products" className="flex items-center gap-3 py-2.5 px-4 rounded-md hover:bg-slate-700 transition-colors text-sm">
+          <ShoppingBag size={18} />
+          Manage Products
+        </Link>
         {/* <Link href="/admin/settings" className="flex items-center gap-3 py-2.5 px-4 rounded-md hover:bg-slate-700 transition-colors text-sm">
           <Settings size={18} />
           Settings
