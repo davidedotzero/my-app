@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { addProductAction, type ProductActionResponse } from '@/app/admin/products/actions'; //ไปยัง actions.tstype MediaActionResponse
 import MediaSelectorModal from '@/components/admin/media/MediaSelectorModal'; // ตรวจสอบ Path
-import { ImageIcon } from 'lucide-react';
+import { ImageIcon, PlusCircle, XCircle } from 'lucide-react';
 
 // Metadata ไม่สามารถ export จาก Client Component โดยตรง
 // คุณจะต้องตั้งค่า Metadata ผ่าน parent Server Component (เช่น layout.tsx เฉพาะสำหรับหน้านี้)
@@ -24,9 +24,17 @@ export default function AddNewProductPage(/* { searchParams: initialSearchParams
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string>('');
+
+  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
+  const [selectedGalleryImageUrls, setSelectedGalleryImageUrls] = useState<string[]>([]);
+
+
   const [formMessage, setFormMessage] = useState<{ text?: string; type?: 'error' | 'success'; field?: string } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+
+
 
   useEffect(() => {
     const error = searchParamsHook.get('error');
@@ -49,6 +57,18 @@ export default function AddNewProductPage(/* { searchParams: initialSearchParams
     setSelectedImageUrl(imageUrl);
     setIsModalOpen(false);
   };
+
+  const handleGalleryImagesSelect = (imageUrls: string[]) => {
+    setSelectedGalleryImageUrls(prevUrls => {
+      const newUrls = imageUrls.filter(url => !prevUrls.includes(url));
+      return [...prevUrls, ...newUrls];
+    });
+    setIsGalleryModalOpen(false);
+  };
+
+  const removeGalleryImage = (urlToRemove: string) => {
+    setSelectedGalleryImageUrls(prevUrls => prevUrls.filter(url => url !== urlToRemove));
+  };
   
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -64,6 +84,13 @@ export default function AddNewProductPage(/* { searchParams: initialSearchParams
       // อาจจะต้อง set เป็นค่าว่าง หรือ null ตามที่ Server Action คาดหวัง
       formData.delete('image_url'); // หรือ formData.set('image_url', '');
     }
+
+    if (selectedGalleryImageUrls.length > 0) {
+      formData.set('images_json', JSON.stringify(selectedGalleryImageUrls));
+    } else {
+      formData.delete('images_json');
+    }
+    formData.delete('image_file'); 
     // ถ้าคุณไม่มี input type="file" name="image_file" ในฟอร์มนี้แล้ว ก็ไม่จำเป็นต้อง delete
     // formData.delete('image_file'); 
 
@@ -168,29 +195,39 @@ export default function AddNewProductPage(/* { searchParams: initialSearchParams
               เลือกจากคลังมีเดีย
             </button>
           </div>
-          {/* ไม่จำเป็นต้องมี hidden input ถ้าเราใช้ formData.set('image_url', ...) ใน handleSubmit */}
+          
         </div>
-        
-        {/* ถ้ายังต้องการให้อัปโหลดไฟล์โดยตรงจากหน้านี้ (เป็นทางเลือก) ก็ใส่ input file ที่นี่ */}
-        {/* <div>
-          <label htmlFor="image_file" className="block text-sm font-medium text-foreground/90 mb-1.5">
-            หรือ อัปโหลดไฟล์ใหม่โดยตรง:
-          </label>
-          <input
-            type="file"
-            name="image_file" 
-            id="image_file"
-            accept="image/png, image/jpeg, image/webp, image/gif"
-            className="w-full text-sm text-slate-500..."
-            disabled={isSubmitting}
-          />
-        </div> */}
 
         <div>
-          <label htmlFor="images" className="block text-sm font-medium text-foreground/90 mb-1.5">
-            URL รูปภาพเพิ่มเติม (แกลเลอรี, คั่นด้วยลูกน้ำ ,)
-          </label>
-          <textarea name="images" id="images" rows={3} className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors" placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"></textarea>
+          <label className="block text-sm font-medium text-foreground/90 mb-1.5">รูปภาพเพิ่มเติม (แกลเลอรี)</label>
+          <div className="mt-1 p-3 border border-input rounded-lg bg-background space-y-3">
+            {selectedGalleryImageUrls.length > 0 && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                {selectedGalleryImageUrls.map((url, index) => (
+                  <div key={index} className="relative group aspect-square">
+                    <Image src={url} alt={`Gallery image ${index + 1}`} fill className="object-cover rounded-md border" />
+                    <button 
+                      type="button" 
+                      onClick={() => removeGalleryImage(url)}
+                      className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                      title="ลบรูปนี้ออกจากแกลเลอรี"
+                      disabled={isSubmitting}
+                    >
+                      <XCircle size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsGalleryModalOpen(true)}
+              className="inline-flex items-center gap-2 py-2 px-4 bg-secondary text-secondary-foreground rounded-md text-sm font-medium hover:bg-secondary/80"
+              disabled={isSubmitting}
+            >
+              <PlusCircle size={16} /> เพิ่มรูปภาพเข้าแกลเลอรี
+            </button>
+          </div>
         </div>
 
         <div>
@@ -223,6 +260,13 @@ export default function AddNewProductPage(/* { searchParams: initialSearchParams
         onImageSelect={handleImageSelectFromMediaLibrary}
         currentImageUrl={selectedImageUrl}
       />
+
+      {/* <MediaSelectorModal
+        isOpen={isGalleryModalOpen}
+        onClose={() => setIsGalleryModalOpen(false)}
+        onImagesSelect={handleGalleryImagesSelect}
+        multiSelect={true}
+      />เดี๋ยวมาทำ */} 
     </div>
   );
 }
