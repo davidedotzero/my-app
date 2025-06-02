@@ -39,7 +39,7 @@ export async function addProductAction(formData: FormData): Promise<ProductActio
     return { error: 'Unauthorized', message: 'คุณไม่มีสิทธิ์ดำเนินการนี้' };
   }
   // --- สิ้นสุดการตรวจสอบสิทธิ์ Admin ---
-
+  
   const name = formData.get('name') as string;
   let slug = formData.get('slug') as string;
   const description = formData.get('description') as string | null;
@@ -48,7 +48,9 @@ export async function addProductAction(formData: FormData): Promise<ProductActio
   const stockQuantityString = formData.get('stock_quantity') as string | null;
   
   // รับ image_url โดยตรงจากฟอร์ม (ซึ่ง Client Component ควรจะ set ค่านี้หลังจากเลือกจาก Media Library)
-  const imageUrlFromForm = formData.get('image_url') as string | null; 
+  const imageUrlFromForm = formData.get('image_url') as string | null;
+  const imagesJsonString = formData.get('images_json') as string | null;
+  let imagesArray: string[] | null = null;
 
   if (!name || !priceString) {
     return { error: 'Validation Failed', message: 'ชื่อสินค้า และราคา เป็นฟิลด์ที่จำเป็น', field: !name ? 'name' : 'price' };
@@ -69,9 +71,20 @@ export async function addProductAction(formData: FormData): Promise<ProductActio
 
   const stock_quantity = stockQuantityString ? parseInt(stockQuantityString, 10) : 0;
 
+  if (imagesJsonString) {
+    try {
+      const parsed = JSON.parse(imagesJsonString);
+      if (Array.isArray(parsed) && parsed.every(item => typeof item === 'string')) {
+        imagesArray = parsed;
+      } else {
+        console.warn("[AddProductAction] Invalid format for images_json, expected array of strings.");
+      }
+    } catch (e) {
+      console.error("[AddProductAction] Error parsing images_json:", e);
+    }
+  }
   // ไม่มีการอัปโหลดไฟล์โดยตรงใน Action นี้แล้ว
   // image_url จะมาจาก Media Library ที่ Client Component จัดการ
-
   const { data: newProduct, error: dbError } = await supabase
     .from('products')
     .insert([{
@@ -82,7 +95,7 @@ export async function addProductAction(formData: FormData): Promise<ProductActio
       image_url: imageUrlFromForm?.trim() || null, // ใช้ URL จากฟอร์ม
       product_type: productType?.trim() || null,
       stock_quantity: isNaN(stock_quantity) ? 0 : stock_quantity,
-      // images: imagesArray, // ถ้าจะจัดการ gallery images array
+      images: imagesArray, // ถ้าจะจัดการ gallery images array
     }])
     .select('id, slug, product_type') // ดึง id กลับมาด้วย
     .single();
@@ -145,6 +158,8 @@ export async function updateProductAction(
   
   // รับ image_url โดยตรง (ที่ถูก set โดย client หลังจากเลือกจาก media library หรือเป็น URL เดิม)
   const imageUrlFromForm = formData.get('image_url') as string | null;
+  const imagesJsonString = formData.get('images_json') as string | null;
+  let imagesArray: string[] | null = null;
 
   if (!name || !priceString) {
     return { error: 'Validation Failed', message: 'ชื่อสินค้า และราคา เป็นฟิลด์ที่จำเป็น', field: !name ? 'name' : 'price' };
@@ -158,7 +173,14 @@ export async function updateProductAction(
   if (!newSlug) return { error: 'Invalid Slug', message: 'ไม่สามารถสร้าง Slug ได้', field: 'slug' };
 
   const stock_quantity = stockQuantityString ? parseInt(stockQuantityString, 10) : 0;
-
+  if (imagesJsonString) {
+    try {
+      const parsed = JSON.parse(imagesJsonString);
+      if (Array.isArray(parsed) && parsed.every(item => typeof item === 'string')) {
+        imagesArray = parsed;
+      } else { /* ... log warning ... */ }
+    } catch (e) { /* ... log error ... */ }
+  }
   // ไม่มีการอัปโหลดไฟล์โดยตรงใน Action นี้แล้ว
 
   const updatePayload = {
@@ -169,6 +191,7 @@ export async function updateProductAction(
     image_url: imageUrlFromForm?.trim() || null, // ใช้ URL จากฟอร์ม
     product_type: productType?.trim() || null,
     stock_quantity: isNaN(stock_quantity) ? 0 : stock_quantity,
+    images: imagesArray,
   };
 
   const { data: updatedProductData, error: dbError } = await supabase
