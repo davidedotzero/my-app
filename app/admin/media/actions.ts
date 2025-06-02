@@ -16,6 +16,22 @@ export type MediaActionResponse = {
   uploadedFiles?: { name: string; url: string; path: string }[];
 };
 
+export type MediaItem = {
+  id: string; // UUID
+  storage_bucket_id: string;
+  storage_object_path: string;
+  alt_text: string | null;
+  title: string | null;
+  caption: string | null;
+  original_filename: string | null;
+  mime_type: string | null;
+  size_kb: number | null;
+  uploaded_by: string | null;
+  created_at: string;
+  updated_at: string;
+  publicUrl?: string; // เพิ่มตอน fetch
+};
+
 // generateSlug ไม่ได้ใช้ใน media actions โดยตรง แต่ถ้ามีก็ไม่เป็นไร
 // function generateSlug(text: string): string { /* ... */ }
 
@@ -176,4 +192,45 @@ export async function deleteMediaItemAction(
   revalidatePath('/admin/media');
   const successMsg = 'รูปภาพและ metadata ถูกลบเรียบร้อยแล้ว!';
   return { success: true, message: successMsg };
+}
+
+
+
+export async function getMediaItemsAction(
+  page: number = 1, 
+  limit: number = 12 // จำนวนรูปต่อหน้า
+): Promise<{ items: MediaItem[]; count: number | null; error?: string }> {
+  const supabase = await createClient();
+
+  // (Optional) Admin auth check - ถ้าต้องการให้เฉพาะ Admin เรียกได้
+  // const { data: { user } } = await supabase.auth.getUser();
+  // if (!user) return { items: [], count: 0, error: 'Authentication required.' };
+  // const { data: adminProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  // if (adminProfile?.role !== 'admin') return { items: [], count: 0, error: 'Unauthorized.' };
+
+  const offset = (page - 1) * limit;
+
+  const { data, error, count } = await supabase
+    .from('media') // ชื่อตาราง metadata รูปภาพของคุณ
+    .select('*', { count: 'exact' }) // ดึง count สำหรับ pagination
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
+    .returns<Omit<MediaItem, 'publicUrl'>[]>(); // Omit publicUrl เพราะจะสร้างเอง
+
+  if (error) {
+    console.error('[GetMediaItemsAction] Error fetching media items:', error);
+    return { items: [], count: 0, error: error.message };
+  }
+
+  if (!data) {
+    return { items: [], count: 0 };
+  }
+
+  // สร้าง Public URL ให้แต่ละ item
+  const itemsWithPublicUrl = data.map(item => ({
+    ...item,
+    publicUrl: supabase.storage.from(item.storage_bucket_id).getPublicUrl(item.storage_object_path).data.publicUrl,
+  }));
+
+  return { items: itemsWithPublicUrl, count };
 }

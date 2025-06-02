@@ -26,7 +26,7 @@ const creationCategories = [
     description: "จำลองความงามอันเรียบง่ายของสวนหินเซนในขนาดที่พอเหมาะ สร้างมุมแห่งสมาธิและความผ่อนคลาย",
     imageUrl: "https://via.placeholder.com/600x400/b2c2b2/333333?text=Daiki+Zenscapes", // << เปลี่ยนรูปภาพที่นี่
     imageAlt: "สวนหินเซนจำลอง",
-    link: "/creations/zen-gardens", // <--- ลิงก์ไปยังหน้ารวมสวนหินเซน (จะสร้างทีหลัง)
+    link: "/creations/zen-garden", // <--- ลิงก์ไปยังหน้ารวมสวนหินเซน (จะสร้างทีหลัง)
     icon: <Mountain size={28} className="text-primary" />, // (Optional)
   },
   {
