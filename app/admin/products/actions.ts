@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation'; // ยังคงใช้ redirect สำหรับ success case หลัก
 import { v4 as uuidv4 } from 'uuid'; // ถ้ายังใช้ในการสร้างชื่อไฟล์ใน Media Library Action
+import Papa from 'papaparse';
 
 const BUCKET_NAME = 'productimages';
 
@@ -23,6 +24,163 @@ function generateSlug(text: string): string {
   let slug = text.toLowerCase().trim().replace(/[\u0E00-\u0E7F]+/g, '').replace(/\s+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-').replace(/^-+/, '').replace(/-+$/, '');
   if (!slug) { return `product-${Date.now().toString().slice(-7)}`; }
   return slug;
+}
+
+// Type สำหรับผลลัพธ์ของ CSV Import Action
+export type CsvImportResponse = {
+  successMessage?: string;
+  error?: string;
+  message?: string;
+  totalProcessed?: number;
+  successCount?: number;
+  errorCount?: number;
+  errorDetails?: { row: number; error: string; data?: any }[];
+};
+// Type สำหรับข้อมูล Product จาก CSV (ควรจะตรงกับ Header ใน CSV ของคุณ)
+type CsvProductRow = {
+  name: string;
+  slug?: string;
+  description?: string;
+  price: string; // รับเป็น string ก่อน แล้วค่อยแปลง
+  product_type?: string;
+  image_url?: string;
+  images_json?: string; // JSON string ของ array URL
+  stock_quantity?: string; // รับเป็น string ก่อน
+  // เพิ่มฟิลด์อื่นๆ ตาม CSV template ของคุณ
+};
+
+//import-csv
+export async function importProductsFromCsvAction(formData: FormData): Promise<CsvImportResponse> {
+  const supabase = await createClient();
+
+  // --- ตรวจสอบสิทธิ์ Admin ---
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return { error: 'Authentication Required', message: 'กรุณาเข้าสู่ระบบ' };
+  const { data: adminProfile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  if (profileError || adminProfile?.role !== 'admin') return { error: 'Unauthorized', message: 'คุณไม่มีสิทธิ์ดำเนินการนี้' };
+  // --- สิ้นสุดการตรวจสอบสิทธิ์ ---
+
+  const file = formData.get('csvFile') as File | null;
+
+  if (!file || file.size === 0) {
+    return { error: 'กรุณาเลือกไฟล์ CSV ที่ต้องการอัปโหลด' };
+  }
+
+  if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+     return { error: 'ประเภทไฟล์ไม่ถูกต้อง กรุณาอัปโหลดไฟล์ .csv เท่านั้น' };
+  }
+
+  const fileContent = await file.text();
+  let parsedData: CsvProductRow[] = [];
+
+  try {
+    const results = Papa.parse<CsvProductRow>(fileContent, {
+      header: true,        // ให้บรรทัดแรกเป็น Header
+      skipEmptyLines: true, // ข้ามบรรทัดที่ว่าง
+      dynamicTyping: false, // รับทุกอย่างเป็น string ก่อน แล้วค่อยแปลง type เอง
+    });
+    if (results.errors.length > 0) {
+      console.error("CSV Parsing errors:", results.errors);
+      return { error: `เกิดข้อผิดพลาดในการอ่านไฟล์ CSV: ${results.errors[0].message}` };
+    }
+    parsedData = results.data;
+  } catch (e: any) {
+    console.error("Error parsing CSV:", e);
+    return { error: `เกิดข้อผิดพลาดในการประมวลผลไฟล์ CSV: ${e.message}` };
+  }
+
+  if (parsedData.length === 0) {
+    return { error: 'ไฟล์ CSV ว่างเปล่า หรือไม่มีข้อมูลที่สามารถประมวลผลได้' };
+  }
+
+  const productsToInsert = [];
+  const errorDetails: { row: number; error: string; data?: any }[] = [];
+  let successCount = 0;
+
+  for (let i = 0; i < parsedData.length; i++) {
+    const row = parsedData[i];
+    const rowIndex = i + 2; // +2 เพราะ header คือแถว 1, ข้อมูลเริ่มแถว 2
+
+    // --- Validate และ Transform ข้อมูลแต่ละแถว ---
+    if (!row.name || !row.price) {
+      errorDetails.push({ row: rowIndex, error: 'ชื่อสินค้า (name) และ ราคา (price) เป็นฟิลด์ที่จำเป็น', data: row });
+      continue;
+    }
+    
+    const price = parseFloat(row.price);
+    if (isNaN(price) || price < 0) {
+      errorDetails.push({ row: rowIndex, error: `ราคาไม่ถูกต้อง: "${row.price}"`, data: row });
+      continue;
+    }
+
+    let slug = row.slug?.trim();
+    if (!slug) slug = generateSlug(row.name); else slug = generateSlug(slug);
+    if (!slug) {
+        errorDetails.push({ row: rowIndex, error: `ไม่สามารถสร้าง Slug จากชื่อสินค้า "${row.name}" ได้`, data: row });
+        continue;
+    }
+
+    let imagesArray: string[] | null = null;
+    if (row.images_json && row.images_json.trim() !== "") {
+      try {
+        const parsedImages = JSON.parse(row.images_json);
+        if (Array.isArray(parsedImages) && parsedImages.every(item => typeof item === 'string')) {
+          imagesArray = parsedImages;
+        } else { imagesArray = [row.images_json]; /* ถ้าไม่ใช่ array ก็เก็บเป็น array ที่มี string นั้น */ }
+      } catch (e) { imagesArray = [row.images_json]; /* ถ้า parse ไม่ได้ ก็เก็บเป็น string เดี่ยวๆ ใน array */ }
+    }
+    
+    const stock_quantity = row.stock_quantity ? parseInt(row.stock_quantity, 10) : 0;
+
+
+
+    productsToInsert.push({
+      name: row.name.trim(),
+      slug: slug,
+      description: row.description?.trim() || null,
+      price: price,
+      product_type: row.product_type?.trim() || null,
+      image_url: row.image_url?.trim() || null,
+      images: imagesArray,
+      stock_quantity: isNaN(stock_quantity) ? 0 : stock_quantity,
+    });
+  }
+
+  if (productsToInsert.length > 0) {
+    const { error: insertError, data: insertedData } = await supabase
+      .from('products')
+      .insert(productsToInsert)
+      .select(); // เพื่อให้รู้ว่า insert ไปกี่รายการ
+
+    if (insertError) {
+      console.error("Supabase Insert Error (CSV Import):", insertError);
+      errorDetails.push({ row: 0, error: `เกิดข้อผิดพลาดตอนบันทึกข้อมูลลง Database: ${insertError.message}` });
+    } else {
+      successCount = insertedData?.length || 0;
+    }
+  }
+
+  revalidatePath('/admin/products');
+  revalidatePath('/creations');
+  // (Optional) revalidate paths อื่นๆ ที่เกี่ยวข้อง
+
+  if (errorDetails.length > 0) {
+    return {
+      error: 'มีบางรายการในไฟล์ CSV ไม่สามารถนำเข้าได้',
+      successMessage: successCount > 0 ? `นำเข้าข้อมูลสำเร็จ ${successCount} รายการ` : undefined,
+      totalProcessed: parsedData.length,
+      successCount: successCount,
+      errorCount: errorDetails.length,
+      errorDetails: errorDetails,
+    };
+  }
+
+  return {
+    successMessage: `นำเข้าข้อมูลสินค้า ${successCount} รายการจากไฟล์ CSV สำเร็จ!`,
+    totalProcessed: parsedData.length,
+    successCount: successCount,
+    errorCount: 0,
+  };
 }
 
 // --- เพิ่มสินค้า ---

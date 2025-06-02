@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Home, FileText, Settings, Users, ShoppingBag } from 'lucide-react'; // ตัวอย่าง Icons
+import { Home, FileText, Settings, Users, ShoppingBag, UploadCloud } from 'lucide-react'; // ตัวอย่าง Icons
 
 function AdminSidebar() {
   return (
@@ -41,6 +41,10 @@ function AdminSidebar() {
         <Link href="/admin/media" className="flex items-center gap-3 py-2.5 px-4 rounded-md hover:bg-slate-700 transition-colors text-sm">
           <ShoppingBag size={18} />
           Manage Media
+        </Link>
+        <Link href="/admin/products/import-csv" className="flex items-center gap-3 pl-8 pr-3 py-2 rounded-md hover:bg-slate-700 transition-colors text-xs text-slate-300"> {/* << ลิงก์ย่อย */}
+          <UploadCloud size={16} /> {/* หรือ Upload */}
+          นำเข้าจาก CSV
         </Link>
         {/* <Link href="/admin/settings" className="flex items-center gap-3 py-2.5 px-4 rounded-md hover:bg-slate-700 transition-colors text-sm">
           <Settings size={18} />
