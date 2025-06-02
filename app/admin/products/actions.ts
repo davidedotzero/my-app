@@ -39,14 +39,14 @@ export async function addProductAction(formData: FormData): Promise<ProductActio
     return { error: 'Unauthorized', message: 'คุณไม่มีสิทธิ์ดำเนินการนี้' };
   }
   // --- สิ้นสุดการตรวจสอบสิทธิ์ Admin ---
-  
+
   const name = formData.get('name') as string;
   let slug = formData.get('slug') as string;
   const description = formData.get('description') as string | null;
   const priceString = formData.get('price') as string;
   const productType = formData.get('product_type') as string | null;
   const stockQuantityString = formData.get('stock_quantity') as string | null;
-  
+
   // รับ image_url โดยตรงจากฟอร์ม (ซึ่ง Client Component ควรจะ set ค่านี้หลังจากเลือกจาก Media Library)
   const imageUrlFromForm = formData.get('image_url') as string | null;
   const imagesJsonString = formData.get('images_json') as string | null;
@@ -66,7 +66,7 @@ export async function addProductAction(formData: FormData): Promise<ProductActio
     slug = generateSlug(slug);
   }
   if (!slug) {
-    return { error: 'Invalid Slug', message: 'ไม่สามารถสร้าง Slug ได้ กรุณาตรวจสอบชื่อสินค้า หรือกรอก Slug เอง (ภาษาอังกฤษ)' , field: 'slug'};
+    return { error: 'Invalid Slug', message: 'ไม่สามารถสร้าง Slug ได้ กรุณาตรวจสอบชื่อสินค้า หรือกรอก Slug เอง (ภาษาอังกฤษ)', field: 'slug' };
   }
 
   const stock_quantity = stockQuantityString ? parseInt(stockQuantityString, 10) : 0;
@@ -102,12 +102,12 @@ export async function addProductAction(formData: FormData): Promise<ProductActio
 
   if (dbError) {
     let userErrorMessage = `เกิดข้อผิดพลาดในการเพิ่มสินค้า: ${dbError.message}`;
-    if (dbError.code === '23505') { 
+    if (dbError.code === '23505') {
       userErrorMessage = `เกิดข้อผิดพลาด: ${dbError.message.includes('products_slug_key') ? `Slug "${slug}"` : `ชื่อสินค้า "${name}"`} นี้มีอยู่แล้ว`;
     }
     return { error: 'Database Error', message: userErrorMessage };
   }
-  
+
   if (!newProduct) {
     return { error: 'Insert Failed', message: 'ไม่สามารถเพิ่มสินค้าได้ อาจมีปัญหาบางอย่าง' };
   }
@@ -119,7 +119,7 @@ export async function addProductAction(formData: FormData): Promise<ProductActio
   if (newProduct.product_type) revalidatePath(`/creations/${newProduct.product_type}`);
   if (newProduct.slug && newProduct.product_type) revalidatePath(`/creations/${newProduct.product_type}/${newProduct.slug}`);
   revalidatePath('/');
-  
+
   const successMessage = 'เพิ่มสินค้าใหม่เรียบร้อยแล้ว!';
   // เราจะ redirect จาก client หลังจากได้รับ success message
   // หรือถ้าต้องการ redirect จาก server action เลย ก็ทำได้ แต่ client จะไม่ได้ success message โดยตรง
@@ -130,9 +130,9 @@ export async function addProductAction(formData: FormData): Promise<ProductActio
 
 // --- แก้ไขสินค้า ---
 export async function updateProductAction(
-  productId: number, 
-  currentProductSlug: string, 
-  currentProductType: string | null, 
+  productId: number,
+  currentProductSlug: string,
+  currentProductType: string | null,
   formData: FormData
 ): Promise<ProductActionResponse> {
   'use server';
@@ -140,9 +140,9 @@ export async function updateProductAction(
 
   // --- Admin Auth Check --- (เหมือนใน addProductAction)
   const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) return { error: 'Authentication Required', message: 'กรุณาเข้าสู่ระบบ'};
+  if (authError || !user) return { error: 'Authentication Required', message: 'กรุณาเข้าสู่ระบบ' };
   const { data: adminProfile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (profileError || adminProfile?.role !== 'admin') return { error: 'Unauthorized', message: 'คุณไม่มีสิทธิ์ดำเนินการนี้'};
+  if (profileError || adminProfile?.role !== 'admin') return { error: 'Unauthorized', message: 'คุณไม่มีสิทธิ์ดำเนินการนี้' };
   // --- End Admin Auth Check ---
 
   if (isNaN(productId) || productId <= 0) {
@@ -155,10 +155,12 @@ export async function updateProductAction(
   const priceString = formData.get('price') as string;
   const productType = formData.get('product_type') as string | null;
   const stockQuantityString = formData.get('stock_quantity') as string | null;
-  
+
   // รับ image_url โดยตรง (ที่ถูก set โดย client หลังจากเลือกจาก media library หรือเป็น URL เดิม)
   const imageUrlFromForm = formData.get('image_url') as string | null;
   const imagesJsonString = formData.get('images_json') as string | null;
+  console.log('[UpdateProductAction] Received images_json string from form:', imagesJsonString); // <--- DEBUG
+
   let imagesArray: string[] | null = null;
 
   if (!name || !priceString) {
@@ -172,27 +174,38 @@ export async function updateProductAction(
   if (!newSlug) newSlug = generateSlug(name); else newSlug = generateSlug(newSlug);
   if (!newSlug) return { error: 'Invalid Slug', message: 'ไม่สามารถสร้าง Slug ได้', field: 'slug' };
 
-  const stock_quantity = stockQuantityString ? parseInt(stockQuantityString, 10) : 0;
-  if (imagesJsonString) {
+  if (imagesJsonString && imagesJsonString.trim() !== "") {
     try {
       const parsed = JSON.parse(imagesJsonString);
       if (Array.isArray(parsed) && parsed.every(item => typeof item === 'string')) {
-        imagesArray = parsed;
-      } else { /* ... log warning ... */ }
-    } catch (e) { /* ... log error ... */ }
+        imagesArray = parsed.length > 0 ? parsed : null;
+      } else {
+        console.warn("[UpdateProductAction] Invalid format for images_json, expected array of strings. Received:", parsed);
+        imagesArray = null;
+      }
+    } catch (e) {
+      console.error("[UpdateProductAction] Error parsing images_json:", e);
+      imagesArray = null;
+    }
+  } else if (imagesJsonString === null || imagesJsonString.trim() === "") {
+    imagesArray = null;
+    console.log("[UpdateProductAction] images_json was empty or null, setting imagesArray to null/empty.");
   }
-  // ไม่มีการอัปโหลดไฟล์โดยตรงใน Action นี้แล้ว
+  console.log("[UpdateProductAction] Parsed imagesArray:", imagesArray);
+
+  const stock_quantity = stockQuantityString ? parseInt(stockQuantityString, 10) : 0;
 
   const updatePayload = {
     name: name.trim(),
     slug: newSlug,
     description: description?.trim() || null,
-    price,
+    price: parseFloat(priceString),
     image_url: imageUrlFromForm?.trim() || null, // ใช้ URL จากฟอร์ม
     product_type: productType?.trim() || null,
     stock_quantity: isNaN(stock_quantity) ? 0 : stock_quantity,
     images: imagesArray,
   };
+  console.log(`[UpdateProductAction - ID: ${productId}] Updating DB with payload:`, updatePayload);
 
   const { data: updatedProductData, error: dbError } = await supabase
     .from('products')
@@ -214,7 +227,7 @@ export async function updateProductAction(
   revalidatePath('/creations');
   revalidatePath('/');
   if (currentProductSlug !== updatedProductData.slug || currentProductType !== updatedProductData.product_type) {
-    if(currentProductType && currentProductSlug) revalidatePath(`/creations/${currentProductType}/${currentProductSlug}`);
+    if (currentProductType && currentProductSlug) revalidatePath(`/creations/${currentProductType}/${currentProductSlug}`);
   }
   if (updatedProductData.product_type && updatedProductData.slug) revalidatePath(`/creations/${updatedProductData.product_type}/${updatedProductData.slug}`);
   if (updatedProductData.product_type) revalidatePath(`/creations/${updatedProductData.product_type}`);
@@ -222,6 +235,7 @@ export async function updateProductAction(
   const successMessage = 'อัปเดตสินค้าเรียบร้อยแล้ว!';
   // redirect(`/admin/products?message=${encodeURIComponent(successMessage)}`);
   return { success: true, message: successMessage };
+
 }
 
 
@@ -230,9 +244,9 @@ export async function deleteProductAction(productId: number): Promise<ProductAct
   // ... (โค้ด Admin Auth Check เหมือนด้านบน) ...
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: 'Authentication Required', message: 'กรุณาเข้าสู่ระบบ'};
+  if (!user) return { error: 'Authentication Required', message: 'กรุณาเข้าสู่ระบบ' };
   const { data: adminProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-  if (adminProfile?.role !== 'admin') return { error: 'Unauthorized', message: 'คุณไม่มีสิทธิ์ดำเนินการนี้'};
+  if (adminProfile?.role !== 'admin') return { error: 'Unauthorized', message: 'คุณไม่มีสิทธิ์ดำเนินการนี้' };
 
 
   if (isNaN(productId) || productId <= 0) {
@@ -247,9 +261,9 @@ export async function deleteProductAction(productId: number): Promise<ProductAct
     .single();
 
   if (fetchErr && fetchErr.code !== 'PGRST116') { // PGRST116 คือ no rows, ซึ่งก็โอเคถ้าจะลบ
-    return { error: 'Fetch Error', message: `เกิดข้อผิดพลาดในการค้นหาสินค้าที่จะลบ: ${fetchErr.message}`};
+    return { error: 'Fetch Error', message: `เกิดข้อผิดพลาดในการค้นหาสินค้าที่จะลบ: ${fetchErr.message}` };
   }
-  
+
   // ลบรูปภาพออกจาก Storage (ถ้ามี)
   if (productToDelete?.image_url) {
     try {
@@ -273,6 +287,6 @@ export async function deleteProductAction(productId: number): Promise<ProductAct
   if (productToDelete?.product_type) revalidatePath(`/creations/${productToDelete.product_type}`);
   if (productToDelete?.slug && productToDelete?.product_type) revalidatePath(`/creations/${productToDelete.product_type}/${productToDelete.slug}`);
   revalidatePath('/');
-  
+
   return { success: true, message: 'ลบสินค้าเรียบร้อยแล้ว!' };
 }

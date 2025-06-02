@@ -3,13 +3,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, notFound, useParams } // useParams สำหรับ Client Component
-  from 'next/navigation'; 
+  from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 // ตรวจสอบ Path การ import updateProductAction และ ProductActionResponse ให้ถูกต้อง
-import { updateProductAction, type ProductActionResponse } from '../../actions'; 
+import { updateProductAction, type ProductActionResponse } from '../../actions';
 import MediaSelectorModal from '@/components/admin/media/MediaSelectorModal';
-import { ImageIcon } from 'lucide-react';
+import { ImageIcon, PlusCircle, XCircle } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client'; // <<< --- ใช้ Client-side Supabase Client ---
 
 // Type Product และ Category (ควรจะมาจากไฟล์ types กลาง)
@@ -49,9 +49,13 @@ export default function EditProductPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string>('');
+
+  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
+  const [selectedGalleryImageUrls, setSelectedGalleryImageUrls] = useState<string[]>([]);
+
   const [formMessage, setFormMessage] = useState<{ text?: string; type?: 'error' | 'success'; field?: string } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,10 +74,12 @@ export default function EditProductPage() {
     }
   }, [searchParamsHook]);
 
-  // useEffect สำหรับดึงข้อมูล Product และ Categories ตอน Component โหลด
   useEffect(() => {
     if (isNaN(productId)) {
-      notFound(); // หรือ router.push('/404')
+      // notFound() ไม่สามารถเรียกใน useEffect ของ Client Component ได้โดยตรง
+      // อาจจะต้อง redirect หรือแสดง UI error
+      setFetchError('ID สินค้าไม่ถูกต้อง');
+      setLoading(false);
       return;
     }
 
@@ -82,7 +88,6 @@ export default function EditProductPage() {
       setFetchError(null);
       const supabase = createClient(); // Client-side client
 
-      // 1. ดึงข้อมูล Product
       const { data: productData, error: productFetchError } = await supabase
         .from('products')
         .select('*')
@@ -93,13 +98,14 @@ export default function EditProductPage() {
         console.error(`Error fetching product (ID: ${productId}) for edit:`, productFetchError);
         setFetchError(productFetchError?.message || 'ไม่พบข้อมูลสินค้า');
         setLoading(false);
-        // notFound(); // การเรียก notFound() ใน client component จะซับซ้อนกว่า อาจจะต้อง redirect หรือแสดง UI error
         return;
       }
       setProduct(productData);
-      setSelectedImageUrl(productData.image_url || ''); // ตั้งค่ารูปที่เลือกไว้เริ่มต้น
+      setSelectedImageUrl(productData.image_url || '');
+      setSelectedGalleryImageUrls(productData.images || []); // << ตั้งค่า Gallery Images เริ่มต้น
+      console.log("[EditPage] Initial product.images from DB:", productData.images);
+      console.log("[EditPage] Initial selectedGalleryImageUrls state:", productData.images || []);
 
-      // 2. ดึง Categories
       const { data: categoriesData, error: categoriesFetchError } = await supabase
         .from('categories')
         .select('id, name')
@@ -107,7 +113,7 @@ export default function EditProductPage() {
 
       if (categoriesFetchError) {
         console.error("Error fetching categories for edit form:", categoriesFetchError);
-        setFetchError((prevError) => prevError ? `${prevError}\n ไม่สามารถโหลดหมวดหมู่ได้` : 'ไม่สามารถโหลดหมวดหมู่ได้');
+        setFetchError((prevError) => prevError ? `${prevError}\nไม่สามารถโหลดหมวดหมู่ได้` : 'ไม่สามารถโหลดหมวดหมู่ได้');
       } else if (categoriesData) {
         setCategories(categoriesData as Category[]);
       }
@@ -115,15 +121,45 @@ export default function EditProductPage() {
     };
 
     fetchData();
-  }, [productId]); // ทำงานเมื่อ productId เปลี่ยน
+  }, [productId]);
+
+  useEffect(() => {
+    const error = searchParamsHook.get('error');
+    const message = searchParamsHook.get('message');
+    const success = searchParamsHook.get('success');
+    const field = searchParamsHook.get('field');
+
+    if (success && message) {
+      setFormMessage({ text: decodeURIComponent(message), type: 'success' });
+      // (Optional) Clear query params after displaying message
+      // router.replace('/admin/products/new', { scroll: false }); 
+    } else if (error && message) {
+      setFormMessage({ text: decodeURIComponent(message), type: 'error', field: field || undefined });
+      // (Optional) Clear query params
+      // router.replace('/admin/products/new', { scroll: false });
+    }
+  }, [searchParamsHook, router]);
 
   const handleImageSelectFromMediaLibrary = (imageUrl: string, altText?: string) => {
     setSelectedImageUrl(imageUrl);
     setIsModalOpen(false);
   };
-  
+
+  const handleGalleryImagesSelect = (imageUrls: string[]) => {
+    setSelectedGalleryImageUrls(prevUrls => {
+      const newUrls = imageUrls.filter(url => !prevUrls.includes(url));
+      return [...prevUrls, ...newUrls];
+    });
+    setIsGalleryModalOpen(false);
+  };
+
+  const removeGalleryImage = (urlToRemove: string) => {
+    setSelectedGalleryImageUrls(prevUrls => prevUrls.filter(url => url !== urlToRemove));
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!product) return;
     setIsSubmitting(true);
     setFormMessage(null);
 
@@ -131,20 +167,23 @@ export default function EditProductPage() {
     if (selectedImageUrl) {
       formData.set('image_url', selectedImageUrl);
     } else {
-      formData.delete('image_url'); 
+      formData.delete('image_url');
     }
-    formData.delete('image_file'); // ถ้าไม่มี input image_file แล้ว ก็ไม่เป็นไร
+    formData.delete('image_file');
+
+    formData.set('images_json', JSON.stringify(selectedGalleryImageUrls));
+    console.log('[EditPage] Submitting images_json:', JSON.stringify(selectedGalleryImageUrls)); // DEBUG
 
     // Server Action updateProductAction ควรจะรับ (productId, currentSlug, currentProductType, formData)
     // currentSlug และ currentProductType ควรจะมาจาก product state ที่ fetch มา
     if (!product) {
-        setFormMessage({text: "ไม่พบข้อมูลสินค้าที่จะอัปเดต", type: 'error'});
-        setIsSubmitting(false);
-        return;
+      setFormMessage({ text: "ไม่พบข้อมูลสินค้าที่จะอัปเดต", type: 'error' });
+      setIsSubmitting(false);
+      return;
     }
 
     const result: ProductActionResponse = await updateProductAction(
-      product.id, 
+      product.id,
       product.slug, // currentSlugFromDb
       product.product_type, // currentProductType
       formData
@@ -211,14 +250,14 @@ export default function EditProductPage() {
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-6 bg-card p-6 md:p-8 rounded-xl shadow-lg border border-border">
         {/* Hidden input for current_image_url ไม่จำเป็นถ้า Server Action ไม่ได้ใช้แล้ว */}
         {/* <input type="hidden" name="current_image_url" value={product.image_url || ''} /> */}
-        
+
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-foreground/90 mb-1.5">ชื่อสินค้า <span className="text-destructive">*</span></label>
-          <input type="text" name="name" id="name" required defaultValue={product.name} className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors"/>
+          <input type="text" name="name" id="name" required defaultValue={product.name} className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors" />
         </div>
         <div>
           <label htmlFor="slug" className="block text-sm font-medium text-foreground/90 mb-1.5">Slug (สำหรับ URL)</label>
-          <input type="text" name="slug" id="slug" defaultValue={product.slug} className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors" placeholder="ปล่อยว่างเพื่อสร้างจากชื่อสินค้า"/>
+          <input type="text" name="slug" id="slug" defaultValue={product.slug} className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors" placeholder="ปล่อยว่างเพื่อสร้างจากชื่อสินค้า" />
           <p className="mt-1.5 text-xs text-muted-foreground">ถ้ามีการเปลี่ยนแปลง จะส่งผลต่อ URL</p>
         </div>
         <div>
@@ -246,7 +285,7 @@ export default function EditProductPage() {
           <div className="mt-1 flex items-center flex-wrap gap-4 p-3 border border-input rounded-lg bg-background">
             <div className="w-24 h-24 bg-muted rounded flex items-center justify-center overflow-hidden border border-dashed">
               {selectedImageUrl ? ( // ใช้ selectedImageUrl ที่มาจาก state
-                <Image src={selectedImageUrl} alt="Preview รูปภาพที่เลือก" width={96} height={96} className="object-contain"/>
+                <Image src={selectedImageUrl} alt="Preview รูปภาพที่เลือก" width={96} height={96} className="object-contain" />
               ) : (
                 <ImageIcon size={32} className="text-muted-foreground" />
               )}
@@ -260,15 +299,43 @@ export default function EditProductPage() {
               เลือกจากคลังมีเดีย
             </button>
           </div>
-           <p className="mt-1.5 text-xs text-muted-foreground">
+          <p className="mt-1.5 text-xs text-muted-foreground">
             รูปภาพปัจจุบันจะถูกใช้ถ้าไม่ได้เลือกรูปใหม่จากคลังมีเดีย
           </p>
         </div>
 
         <div>
-          <label htmlFor="images" className="block text-sm font-medium text-foreground/90 mb-1.5">URL รูปภาพเพิ่มเติม (คั่นด้วยลูกน้ำ ,)</label>
-          <textarea name="images" id="images" rows={3} defaultValue={product.images?.join(', ') || ''} className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors" placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"></textarea>
+          <label className="block text-sm font-medium text-foreground/90 mb-1.5">รูปภาพเพิ่มเติม (แกลเลอรี)</label>
+          <div className="mt-1 p-3 border border-input rounded-lg bg-background space-y-3">
+            {selectedGalleryImageUrls.length > 0 && (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                {selectedGalleryImageUrls.map((url, index) => (
+                  <div key={index} className="relative group aspect-square">
+                    <Image src={url} alt={`Gallery image ${index + 1}`} fill className="object-cover rounded-md border" />
+                    <button
+                      type="button"
+                      onClick={() => removeGalleryImage(url)}
+                      className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                      title="ลบรูปนี้ออกจากแกลเลอรี"
+                      disabled={isSubmitting}
+                    >
+                      <XCircle size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsGalleryModalOpen(true)}
+              className="inline-flex items-center gap-2 py-2 px-4 bg-secondary text-secondary-foreground rounded-md text-sm font-medium hover:bg-secondary/80"
+              disabled={isSubmitting}
+            >
+              <PlusCircle size={16} /> เพิ่มรูปภาพเข้าแกลเลอรี
+            </button>
+          </div>
         </div>
+
         <div>
           <label htmlFor="stock_quantity" className="block text-sm font-medium text-foreground/90 mb-1.5">จำนวนในสต็อก</label>
           <input type="number" name="stock_quantity" id="stock_quantity" min="0" step="1" defaultValue={product.stock_quantity ?? 0} className="w-full p-3 border border-input rounded-lg shadow-sm focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground text-sm transition-colors" />
@@ -298,7 +365,14 @@ export default function EditProductPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onImageSelect={handleImageSelectFromMediaLibrary}
-        currentImageUrl={selectedImageUrl} // ส่ง URL ปัจจุบันไปให้ Modal (ถ้าต้องการ)
+        currentImageUrl={selectedImageUrl}
+      />
+
+      <MediaSelectorModal
+        isOpen={isGalleryModalOpen}
+        onClose={() => setIsGalleryModalOpen(false)}
+        onImagesSelect={handleGalleryImagesSelect}
+        multiSelect={true}
       />
     </div>
   );

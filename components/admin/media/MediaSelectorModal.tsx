@@ -10,7 +10,7 @@ import Link from 'next/link';
 type MediaSelectorModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onImageSelect: (selectedImageUrl: string, selectedAltText?: string) => void;
+  onImageSelect?: (selectedImageUrl: string, selectedAltText?: string) => void;
   onImagesSelect?: (selectedImageUrls: string[]) => void;
   multiSelect?: boolean;
   currentImageUrl?: string | null; // (Optional) เพื่อ highlight รูปที่ถูกเลือกอยู่ (ถ้ามี)

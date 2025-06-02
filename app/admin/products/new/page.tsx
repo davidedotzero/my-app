@@ -261,12 +261,12 @@ export default function AddNewProductPage(/* { searchParams: initialSearchParams
         currentImageUrl={selectedImageUrl}
       />
 
-      {/* <MediaSelectorModal
+      <MediaSelectorModal
         isOpen={isGalleryModalOpen}
         onClose={() => setIsGalleryModalOpen(false)}
         onImagesSelect={handleGalleryImagesSelect}
         multiSelect={true}
-      />เดี๋ยวมาทำ */} 
+      />
     </div>
   );
 }
