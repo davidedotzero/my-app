@@ -1,7 +1,8 @@
 import { createClient } from '@/utils/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+// import Image from 'next/image';
+import ProductImageGallery from '@/components/products/ProductImageGallery';
 import type { Metadata } from 'next';
 // (Optional) ถ้าจะใช้ Markdown สำหรับ product.description
 // import ReactMarkdown from 'react-markdown';
@@ -62,6 +63,8 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
     };
   }
 
+   const ogImageUrl = product.image_url?.trim();
+
   return {
     title: `${product.name} | บ้านไม้ดาวิ (ไดกิ บอนไซ)`,
     description: product.description?.substring(0, 155) || `รายละเอียดสินค้า ${product.name}`, // ใช้ description หรือ fallback
@@ -101,8 +104,9 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   }
 
   const categoryName = getCategoryDisplayName(product.product_type); // ใช้ product_type จากสินค้าที่ดึงได้
-  const mainImageUrl = product.image_url?.trim();
-  const galleryImages = product.images?.map(url => url?.trim()).filter(Boolean) as string[] | undefined;
+
+  // const mainImageUrl = product.image_url?.trim();
+  // const galleryImages = product.images?.map(url => url?.trim()).filter(Boolean) as string[] | undefined;
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
@@ -123,32 +127,13 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         </ol>
       </nav>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-start">
-        <div className="space-y-4 lg:sticky lg:top-28">
-          {mainImageUrl && ( // <--- ใช้ mainImageUrl ที่ trim แล้ว
-            <div className="relative aspect-square w-full overflow-hidden rounded-lg shadow-lg border border-border">
-              <Image src={mainImageUrl} alt={product.name} fill sizes="(max-width: 1023px) 100vw, 50vw" className="object-cover" priority />
-            </div>
-          )}
-          {galleryImages && galleryImages.length > 0 && ( // <--- ใช้ galleryImages ที่ trim และ filter แล้ว
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-              {galleryImages.map((imgUrl, index) => {
-                // เพิ่มการตรวจสอบ URL อีกชั้นก่อน render Image
-                let isValidUrl = true;
-                try {
-                  new URL(imgUrl); // ลองสร้าง URL object
-                } catch (e) {
-                  isValidUrl = false;
-                  console.warn(`[ProductDetailPage] Invalid gallery URL detected: ${imgUrl}`);
-                }
-                return isValidUrl ? (
-                  <div key={index} className="relative aspect-square w-full overflow-hidden rounded-md border border-border/50 hover:opacity-80 cursor-pointer">
-                    <Image src={imgUrl} alt={`${product.name} - gallery image ${index + 1}`} fill sizes="20vw" className="object-cover" />
-                  </div>
-                ) : null; // หรือแสดง placeholder สำหรับ URL ที่ไม่ถูกต้อง
-              })}
-            </div>
-          )}
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-start">
+        <div className="lg:sticky lg:top-28"> {/* ปรับ top ตามความสูง Navbar + ระยะห่าง */}
+          <ProductImageGallery 
+            mainImageUrl={product.image_url}
+            galleryImageUrls={product.images}
+            altText={product.name}
+          />
         </div>
 
         {/* Product Details Section */}
