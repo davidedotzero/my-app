@@ -187,7 +187,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             <h2 className="text-xl font-semibold mb-4 text-card-foreground">ลิงก์ด่วน</h2>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/account/change-password" // สร้างหน้านี้ทีหลัง
+                <Link href="/protected/reset-password"
                   className="block text-primary hover:underline font-medium"
                 >
                   เปลี่ยนรหัสผ่าน
