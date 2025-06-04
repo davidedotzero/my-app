@@ -1,8 +1,14 @@
 // app/layout.tsx (Root Layout)
-import { Geist } from "next/font/google"; // เปลี่ยนชื่อ import ให้ชัดเจน
+import { Bai_Jamjuree } from "next/font/google";
 import { ThemeProvider } from "next-themes";
-import { ThemeSwitcher } from "@/components/theme-switcher"; // ถ้า footer นี้ global จริงๆ
+import Footer from "@/components/Footer";
 import "./globals.css";
+
+const bai_jamjuree = Bai_Jamjuree({ // ใช้ชื่อที่ import มา
+  display: "swap",
+  subsets: ["latin", "thai"],
+  weight: ["200", "300", "400", "500", "600", "700"],
+});
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -14,11 +20,7 @@ export const metadata = {
   description: "สร้างสรรค์พื้นที่สีเขียวกับบอนไซ สวนหินเซน และสวนในขวดแก้ว", // ปรับ description
 };
 
-const geistSans = Geist({ // ใช้ชื่อที่ import มา
-  display: "swap",
-  subsets: ["latin"],
-  variable: '--font-geist-sans', // แนะนำให้ใช้ CSS variable สำหรับ font
-});
+
 
 export default function RootLayout({
   children,
@@ -26,23 +28,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={geistSans.variable} suppressHydrationWarning>
+    <html lang="th" className={bai_jamjuree.className} suppressHydrationWarning>
       <body className="bg-background text-foreground">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
-          enableSystem
+          // enableSystem
           disableTransitionOnChange
         >
           <main className="min-h-screen flex flex-col">
             {children}
           </main>
-          <footer className="w-full flex items-center justify-center border-t text-center text-xs gap-8 py-8">
-            <p>
-              Powered by Supabase
-            </p>
-            <ThemeSwitcher />
-          </footer>
+          <Footer />
         </ThemeProvider>
       </body>
     </html>
